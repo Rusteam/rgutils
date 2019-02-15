@@ -1,24 +1,54 @@
+# coding=utf-8
 
 import matplotlib.pyplot as plt
 
-def plot_learning_curve(history, fig_shape=(12,4), plot_style='fivethirtyeight'):
+
+def image_labels_grid(n_row, n_col, torch_dataset, fig_dims=(12,8), 
+                      plot_style='seaborn-white', width_space=0.4, height_space=0.1,
+                      save_fig=None):
     '''
-    Plots learning curve for loss and score both for train and validation
-    -------
-    :metrics is a dict with following keys: ['step', 'val_loss', 'loss', 'val_score', 'score'], where values are lists
+    Plots random images with labels for a torch dataset 
+    (A dataset with indexing and two values for an index: image and its label)
     '''
     plt.style.use(plot_style)
-    plt.figure(figsize=fig_shape)
-    plt.subplot(121)
-    plt.title('Loss curves')
-    plt.plot(history['epoch'], history['train_loss'], 'r--', label='train loss')
-    plt.plot(history['epoch'], history['val_loss'], 'b--', label='validation loss')
-    plt.xlabel('epoch')
-    plt.legend()
-    plt.subplot(122)
-    plt.title('Score curves')
-    plt.plot(history['epoch'], history['train_score'], 'r--', label='train score')
-    plt.plot(history['epoch'], history['val_score'], 'b--', label='validation score')
-    plt.xlabel('epoch')
-    plt.legend()
+    rand_indices = np.random.randint(low=0, high=len(torch_dataset), size=(n_row, n_col))
+    fig,ax = plt.subplots(n_row, n_col, sharex=True, sharey=True, squeeze=False, 
+                          figsize=fig_dims)
+    fig.subplots_adjust(hspace=height_space, wspace=width_space)
+    for r in range(n_row):
+        for c in range(n_col):
+            ax[r, c].imshow(torch_dataset[rand_indices[r,c]][0])
+            ax[r, c].set_title('Label: ' + str(train_dataset[rand_indices[r,c]][1]))
+    
+    if save_fig:
+        plt.savefig(save_fig)
+    plt.show()
+
+    
+def plot_learning_curve(history, metrics=['loss','accuracy'], grid=(1,2),
+                        fig_shape=(12,4), plot_style='fivethirtyeight', save_to=None):
+    '''
+    Plots learning curves both for train and validation
+    for a specified list of metrics[i]ics
+    -------
+    '''
+    plt.style.use(plot_style)
+    fig,ax = plt.subplots(grid[0], grid[1], sharex=False, sharey=False, figsize=fig_shape)
+    for i in range(grid[0]*grid[1]):    
+        row = i // grid[1]
+        col = i % grid[1]
+        if grid[0] > 1:
+            pos = (row, col)
+        else:
+            pos = (col,)
+        if i >= len(metrics):
+            fig.delaxes(ax[pos])
+            break
+        ax[pos].set_title('{} curves'.format(metrics[i]))
+        ax[pos].plot(history['epoch'], history['train_{}'.format(metrics[i])], 'r--', label='train {}'.format(metrics[i]))
+        ax[pos].plot(history['epoch'], history['val_{}'.format(metrics[i])], 'b--', label='validation {}'.format(metrics[i]))
+        ax[pos].set_xlabel('epoch')
+        ax[pos].legend()
+
+    plt.tight_layout()
     plt.show()
