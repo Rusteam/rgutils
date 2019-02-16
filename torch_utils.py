@@ -1,9 +1,9 @@
-# coding=utf-8
 
 import torch
 from torch import nn
 import copy
 from math import floor
+import numpy as np
 
 
 class BinaryClassificationMeter(object):
@@ -270,3 +270,20 @@ def parameter_number(net):
     trainable_params = sum(p.numel() for p in net.parameters() if p.requires_grad)
     print('Total parameters:', total_params)
     print('Trainable parameters:', trainable_params)
+
+
+def autoencoder_output(model, data_loader, num_show, input_dim, output_dim, device,):
+    '''
+    Randomly selects input images and returns a paired output from an autoencoder model
+    '''
+    rand_indices = np.random.randint(0, len(data_loader.dataset), size=num_show)
+    paired_arrays = []
+    for idx in rand_indices:
+        x,_ = data_loader.dataset[idx]
+        x_reshaped = x.view(*input_dim).to(device)
+        
+        y = model(x_reshaped)
+        x_out = np.array(x_reshaped.view(*output_dim).detach())
+        y_out = np.array(y.view(*output_dim).detach())
+        paired_arrays.append([x_out, y_out])
+    return np.array(paired_arrays)
