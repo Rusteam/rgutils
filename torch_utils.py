@@ -215,6 +215,28 @@ def get_output_size(input_size, kernel_size, padding, stride):
     return floor((items['input_size'] - items['kernel_size'] + 2*items['padding']) / items['stride']) + 1
 
 
+def reshaped_size(input_size, conv_layers, print_stats=True):
+    '''
+    Calculates reshaped size after last conv layer
+    Returns spatial size and reshaped size
+    '''
+    out_chan = 1
+    for _,l_ops in conv_layers.items():
+        for op,op_attrs in l_ops.items():
+            try:
+                input_size = get_output_size(input_size, getattr(op_attrs, 'kernel_size'), 
+                                     getattr(op_attrs, 'padding'), getattr(op_attrs, 'stride'))
+                out_chan = getattr(op_attrs, 'out_channels', out_chan)
+            except:
+                continue
+
+    reshaped_size = input_size**2 * out_chan
+    if print_stats:
+        print('Output spatial dimension', input_size)
+        print('Output size (Width * height * channels)', reshaped_size)
+    return input_size, reshaped_size
+
+
 class SimpleCNN(nn.Module):
     '''
     A simple ConvNet with conv layers
