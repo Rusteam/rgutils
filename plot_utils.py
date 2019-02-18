@@ -1,24 +1,24 @@
-# coding=utf-8
 
 import matplotlib.pyplot as plt
+import numpy as np
 
 
-def image_labels_grid(n_row, n_col, torch_dataset, fig_dims=(12,8), 
+def image_labels_grid(n_row, n_col, image_data, fig_dims=(12,8), 
                       plot_style='seaborn-white', width_space=0.4, height_space=0.1,
                       save_fig=None):
     '''
-    Plots random images with labels for a torch dataset 
-    (A dataset with indexing and two values for an index: image and its label)
+    Plots random images with labels for a dataset with methods __len__ & __getitem__
+    (Two values for each index: an image and its label)
     '''
     plt.style.use(plot_style)
-    rand_indices = np.random.randint(low=0, high=len(torch_dataset), size=(n_row, n_col))
+    rand_indices = np.random.randint(low=0, high=len(image_data), size=(n_row, n_col))
     fig,ax = plt.subplots(n_row, n_col, sharex=True, sharey=True, squeeze=False, 
                           figsize=fig_dims)
     fig.subplots_adjust(hspace=height_space, wspace=width_space)
     for r in range(n_row):
         for c in range(n_col):
-            ax[r, c].imshow(torch_dataset[rand_indices[r,c]][0])
-            ax[r, c].set_title('Label: ' + str(train_dataset[rand_indices[r,c]][1]))
+            ax[r, c].imshow(image_data[rand_indices[r,c]][0])
+            ax[r, c].set_title('Label: ' + str(image_data[rand_indices[r,c]][1]))
     
     if save_fig:
         plt.savefig(save_fig)
