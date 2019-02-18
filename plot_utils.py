@@ -52,3 +52,19 @@ def plot_learning_curve(history, metrics=['loss','accuracy'], grid=(1,2),
 
     plt.tight_layout()
     plt.show()
+
+    
+def plot_image_pairs(pairs, grid, fig_shape=(15,7), save_fig=None, style='fivethirtyeight'):
+    '''
+    Plots pairs of images along 2 rows
+    '''
+    plt.style.use(style)
+    fig,ax = plt.subplots(grid[0], grid[1], sharex=True, sharey=True, figsize=fig_shape)
+    for i in range(grid[1]):
+        ax[0, i].imshow(pairs[i, 0])
+        ax[0, i].axis('off')
+        ax[1, i].imshow(pairs[i, 1])
+        ax[1, i].axis('off')
+    if save_fig: 
+        plt.savefig(save_fig)
+    plt.show()
