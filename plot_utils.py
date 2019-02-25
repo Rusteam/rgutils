@@ -1,6 +1,7 @@
 
 import matplotlib.pyplot as plt
 import numpy as np
+import seaborn as sns
 
 
 def image_labels_grid(n_row, n_col, image_data, fig_dims=(12,8), 
@@ -67,4 +68,21 @@ def plot_image_pairs(pairs, grid, fig_shape=(15,7), save_fig=None, style='fiveth
         ax[1, i].axis('off')
     if save_fig: 
         plt.savefig(save_fig)
+    plt.show()
+
+    
+def plot_feature_importances(feature_names, feature_importances, 
+                             orient='h', max_show=15, fig_shape=(8,6)):
+    '''
+    Plots feature importances
+    '''
+    feat_imp = pd.DataFrame(
+        {'feature': feature_names,
+         'importance': feature_importances})
+    feat_imp.sort_values('importance', ascending=False, inplace=True)
+    plt.figure(figsize=fig_shape)
+    plt.title('Feature importances')
+    sns.barplot(feat_imp['importance'].iloc[:max_show],
+                feat_imp['feature'].iloc[:max_show],
+                orient=orient)
     plt.show()
