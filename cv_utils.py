@@ -36,20 +36,3 @@ def extract_frames(video_file, save_dir, frame_skip=0, file_exension='jpeg', vid
     print('{} frames have been extracted from {}'.format(len(file_names), video_file))
     return file_names
 
-
-def holdout_indices(start_range, stop_range, range_step, holdout_len):
-    '''
-    Init empty list
-    For index in (start_range, stop_range, range_step)
-        select random start index within (start_range, stop_range - holdout_len)
-        assing end index by adding houldout_len
-        update the list with selected index range
-    Returns an array of selected indices
-    '''
-    ar = []
-    for i in range(start_range, stop_range, range_step):
-        start_index = np.random.randint(i, i + range_step - holdout_len)
-        end_index = start_index + holdout_len
-        ar.extend(list(np.arange(start_index, end_index)))
-    print('{} indices selected'.format(len(ar)))
-    return np.array(ar)

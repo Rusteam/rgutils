@@ -397,3 +397,21 @@ def cv_predict(cv_models, x_data, inference_params=None):
     for _,mod in cv_models.items():
         cv_predicted += mod.predict(x_data,) / len(cv_models)
     return cv_predicted
+	
+	
+def holdout_indices(start_range, stop_range, range_step, holdout_len):
+    '''
+    Init empty list
+    For index in (start_range, stop_range, range_step)
+        select random start index within (start_range, stop_range - holdout_len)
+        assing end index by adding houldout_len
+        update the list with selected index range
+    Returns an array of selected indices
+    '''
+    ar = []
+    for i in range(start_range, stop_range, range_step):
+        start_index = np.random.randint(i, i + range_step - holdout_len)
+        end_index = start_index + holdout_len
+        ar.extend(list(np.arange(start_index, end_index)))
+    print('{} indices selected'.format(len(ar)))
+    return np.array(ar)
