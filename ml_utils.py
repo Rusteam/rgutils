@@ -399,7 +399,7 @@ def cv_predict(cv_models, x_data, inference_params=None):
     return cv_predicted
 	
 	
-def holdout_indices(start_range, stop_range, range_step, holdout_len):
+def holdout_indices(start_range, stop_range, range_step, holdout_len, print_stats=True):
     '''
     Init empty list
     For index in (start_range, stop_range, range_step)
@@ -410,8 +410,17 @@ def holdout_indices(start_range, stop_range, range_step, holdout_len):
     '''
     ar = []
     for i in range(start_range, stop_range, range_step):
-        start_index = np.random.randint(i, i + range_step - holdout_len)
-        end_index = start_index + holdout_len
-        ar.extend(list(np.arange(start_index, end_index)))
-    print('{} indices selected'.format(len(ar)))
+        end_index = stop_range + 1
+        rep = 0
+        while end_index > stop_range:
+            start_index = np.random.randint(i, i + range_step - holdout_len)
+            end_index = start_index + holdout_len
+            ar.extend(list(np.arange(start_index, end_index)))
+            rep += 1
+            if rep > 5:
+                error_msg = ('Unable to select end_index lower than stop_range. '
+							 'Provide different range_step and holdout_len')
+                raise Exception(error_msg)
+    if print_stats:
+        print('{} indices selected'.format(len(ar)))
     return np.array(ar)
