@@ -17,15 +17,18 @@ def embed_documents(model, document_list, progress_step=None):
     Returns numpy embeddings for each document
     '''
     from flair.embeddings import Sentence
-    doc_len = len(document_list)
-    document_embeddings = np.zeros((doc_len, model.embedding_length))
-    for i,doc in enumerate(document_list):
-        sent = Sentence(doc)
-        model.embed(sent)
-        document_embeddings[i] = np.array(sent.embedding.detach())
-        if (progress_step is not None) and (i % progress_step == 0):
-            print('{} out of {} documents have been embedded'.format(i, doc_len))
-    return document_embeddings
+    sent = np.array(list(map(Sentence, document_list)))
+    f = lambda x: model.embed(x)
+    # TODO add a loop
+    _ = map(f, sent)
+#    document_embeddings = np.zeros((doc_len, model.embedding_length))
+#    for i,doc in enumerate(document_list):
+#        sent = Sentence(doc)
+#        model.embed(sent)
+#        document_embeddings[i] = np.array(sent.embedding.detach())
+#        if (progress_step is not None) and (i % progress_step == 0):
+#            print('{} out of {} documents have been embedded'.format(i, doc_len))
+    return np.array([np.array(s.embedding.detach()) for s in sent])
 
 
 def segment_text_data(word_list, start_index, stop_index, word_len):
