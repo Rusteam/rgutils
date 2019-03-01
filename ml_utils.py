@@ -4,6 +4,7 @@ from pprint import pprint
 from datetime import datetime as dt
 import pandas as pd
 import numpy as np
+import copy
 
 
 def get_date_range(ym_series):
@@ -424,3 +425,36 @@ def holdout_indices(start_range, stop_range, range_step, holdout_len, print_stat
     if print_stats:
         print('{} indices selected'.format(len(ar)))
     return np.array(ar)
+
+
+def quick_ml(models, train_data, val_data, metric_fn):
+    '''
+    Quickly test different ML algorithms and compare scores on train and valid
+    ------
+    Params:
+        models: a dictionary of model names and their callables
+        features: a dataframe of features
+        labels: an array of labels
+        val_size: a portion of data to allocate to validation
+    '''
+    X_train,y_train = train_data
+    X_val,y_val = val_data
+    scores = {}
+    trained = {}
+    for m_name,model in models.items():
+        model.fit(X_train,y_train)
+        train_score = metric_fn(y_train, model.predict(X_train))
+        val_score = metric_fn(y_val, model.predict(X_val))
+        scores[m_name] = (train_score, val_score)
+        trained[m_name] = copy.deepcopy(model)
+    scores = pd.DataFrame(scores, index=['train','val']).T
+    return trained,scores
+
+
+
+def reduce_dimensions(algorithm, data):
+    '''
+    Reduce dimensions of training data
+    '''
+    algorithm.fit(data,)
+    return algorithm, algorithm.transform(data)

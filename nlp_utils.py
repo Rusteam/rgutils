@@ -48,16 +48,16 @@ def segment_text_data(word_list, start_index, stop_index, word_len):
     return train_data
 
 
-def replace_chars(string, replace_dict):
+def replace_chars(string, replace_chars, replacement=' '):
     '''
-    Replace chars in string from replace_dict
-    Keys are replaced by values
+    Replace chars in string from replace_chars
+    Replaces_chars should be like '\n|\d|\W'
     -----
     Returns updated string
     '''
-    for k,v in replace_dict.items():
-        string = re.sub(k, v, string)
-    return string
+    string = re.sub(replace_chars, replacement, string)
+    strin = re.sub('\s+', ' ', string)
+    return string.strip()
 
 
 def read_txt(filepath, replace=None, min_line_len=1, 
