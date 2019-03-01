@@ -9,7 +9,7 @@ import os
 import pickle as pkl
 
 
-def embed_documents(model, document_list, progress_step=None):
+def embed_documents(model, document_list, progress_step=50, print_stats=True):
     '''
     Creates document embedding using given model with `embed` method
     from flair.embeddings package
@@ -17,18 +17,20 @@ def embed_documents(model, document_list, progress_step=None):
     Returns numpy embeddings for each document
     '''
     from flair.embeddings import Sentence
-    sent = np.array(list(map(Sentence, document_list)))
-    f = lambda x: model.embed(x)
-    # TODO add a loop
-    _ = map(f, sent)
-#    document_embeddings = np.zeros((doc_len, model.embedding_length))
-#    for i,doc in enumerate(document_list):
-#        sent = Sentence(doc)
-#        model.embed(sent)
-#        document_embeddings[i] = np.array(sent.embedding.detach())
-#        if (progress_step is not None) and (i % progress_step == 0):
-#            print('{} out of {} documents have been embedded'.format(i, doc_len))
-    return np.array([np.array(s.embedding.detach()) for s in sent])
+    doc_len = len(document_list)
+    document_embeddings = np.zeros((doc_len, model.embedding_length))
+    for i in range(0, doc_len, progress_step):
+        end = min(doc_len, i + progress_step)
+        if i >= end:
+            break
+        docs = document_list[i: end]
+        sent = list(map(lambda x: Sentence(x), docs))
+        model.embed(sent)
+        document_embeddings[i: end] = \
+                        np.array([s.embedding.detach().numpy() for s in sent])
+        if print_stats:
+            print('{} out of {} documents have been embedded'.format(end, doc_len))
+    return document_embeddings
 
 
 def segment_text_data(word_list, start_index, stop_index, word_len):
