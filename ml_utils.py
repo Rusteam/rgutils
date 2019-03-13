@@ -1,4 +1,4 @@
-v# coding=utf-8
+# coding=utf-8
 
 from pprint import pprint
 from datetime import datetime as dt
