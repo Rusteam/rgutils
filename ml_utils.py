@@ -1,5 +1,8 @@
 # coding=utf-8
-
+	
+from sklearn.model_selection import KFold, GridSearchCV
+from sklearn.metrics import f1_score
+import lightgbm as lgb
 from pprint import pprint
 from datetime import datetime as dt
 import pandas as pd
@@ -221,13 +224,6 @@ def change_ratio(current_value, previous_values, exclude_zeros=True, eps=1e-7,):
         nonzero_indices = np.nonzero(previous_values)
         previous_values = previous_values[nonzero_indices]
     return (current_value - np.mean(previous_values)) / (np.std(previous_values) + eps)
-	
-	
-import numpy as np
-import pandas as pd
-from sklearn.model_selection import KFold, GridSearchCV
-from sklearn.metrics import f1_score
-import lightgbm as lgb
 
 
 def neg_mse_to_rmse(neg_mse):
@@ -360,7 +356,7 @@ def cross_validation(train_data, train_labels, estimator, num_folds, metric_func
     (If using lightgbm then provide 'lgb' to estimator and 
     make sure you imported it as "import lightgbm as lgb")
     '''
-    cv = KFold(n_splits=NUM_FOLDS, shuffle=True, random_state=100)
+    cv = KFold(n_splits=num_folds, shuffle=True, random_state=100)
     cv_models = {}
     scores = {'train': {},
               'val': {}}
@@ -386,7 +382,7 @@ def cross_validation(train_data, train_labels, estimator, num_folds, metric_func
             train_predicted = estimator.predict(X_train)
             val_predicted = estimator.predict(X_val)
             scores['train'][new_name] = metric_func(y_train, train_predicted)
-            scores['val'][new_name] = metric_func(y_train, train_predicted)
+            scores['val'][new_name] = metric_func(y_val, val_predicted)
     return cv_models, scores
 
 
