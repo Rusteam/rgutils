@@ -36,3 +36,16 @@ def extract_frames(video_file, save_dir, frame_skip=0, file_exension='jpeg', vid
     print('{} frames have been extracted from {}'.format(len(file_names), video_file))
     return file_names
 
+
+def p1p2_to_xywh(p1, p2):
+    '''
+    From p1 (left upper) and p2 (right lower) points calculate x,y center 
+    and height, width
+    '''
+    assert p1[0] < p2[0], 'second X is not smaller than first'
+    assert p1[1] < p2[1], 'second Y is not smaller than first'
+    w = p2[0] - p1[0]
+    h = p2[1] - p1[1]
+    x = int(p1[0] + w/2)
+    y = int(p1[1] + h/2)
+    return x,y,w,h
