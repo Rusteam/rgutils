@@ -56,7 +56,7 @@ def replace_chars(string, replace_chars, replacement=' '):
     Returns updated string
     '''
     string = re.sub(replace_chars, replacement, string)
-    strin = re.sub('\s+', ' ', string)
+    string = re.sub('\s+', ' ', string)
     return string.strip()
 
 
