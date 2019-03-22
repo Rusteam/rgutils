@@ -4,7 +4,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import seaborn as sns
-
+from PIL import Image
 
 def image_labels_grid(n_row, n_col, image_data, fig_dims=(12,8), 
                       plot_style='seaborn-white', width_space=0.4, height_space=0.1,
@@ -87,4 +87,23 @@ def plot_feature_importances(feature_names, feature_importances,
     sns.barplot(feat_imp['importance'].iloc[:max_show],
                 feat_imp['feature'].iloc[:max_show],
                 orient=orient)
+    plt.show()
+
+    
+def show_images(image_paths, n_row, n_col, fig_dims=(12,8), 
+                plot_style='seaborn-white', spaces=(0.01,0.01),
+                save_fig=None):
+    '''
+    Show images from the list of image_paths
+    '''
+    plt.style.use(plot_style)
+    fig,ax = plt.subplots(n_row, n_col, sharex=True, sharey=True, squeeze=False, 
+                          figsize=fig_dims)
+    fig.subplots_adjust(hspace=spaces[1], wspace=spaces[0])
+    for r in range(n_row):
+        for c in range(n_col):
+            img = Image.open(image_paths[r*(c+1)+c])
+            ax[r, c].imshow(img)
+    if save_fig:
+        plt.savefig(save_fig)
     plt.show()
