@@ -28,11 +28,18 @@ def image_labels_grid(n_row, n_col, image_data, fig_dims=(12,8),
     plt.show()
 
     
-def plot_learning_curve(history, metrics=['loss','accuracy'], grid=(1,2),
-                        fig_shape=(12,4), plot_style='fivethirtyeight', save_to=None):
+def plot_learning_curve(history, metrics=['loss','accuracy'], train=True, val=True,
+                        grid=(1,2), fig_shape=(12,4), plot_style='fivethirtyeight', 
+                        save_to=None):
     '''
     Plots learning curves both for train and validation
     for a specified list of metrics[i]ics
+    -------
+    Params:
+        history: either pd.DataFrame (columns as metrics) or dict (keys as columns)
+        metrics: columns/keys without 'train'/'val' prefix to plot
+        train: True if plot train metrics
+        val: True if plot val metrics
     -------
     '''
     plt.style.use(plot_style)
@@ -48,13 +55,17 @@ def plot_learning_curve(history, metrics=['loss','accuracy'], grid=(1,2),
             fig.delaxes(ax[pos])
             break
         ax[pos].set_title('{} curves'.format(metrics[i]))
-        ax[pos].plot(history['epoch'], history['train_{}'.format(metrics[i])], 'r--', label='train {}'.format(metrics[i]))
-        ax[pos].plot(history['epoch'], history['val_{}'.format(metrics[i])], 'b--', label='validation {}'.format(metrics[i]))
+        if train:
+            ax[pos].plot(history['epoch'], history['train_{}'.format(metrics[i])], 'r--', label='train {}'.format(metrics[i]))
+        if val:
+            ax[pos].plot(history['epoch'], history['val_{}'.format(metrics[i])], 'b--', label='validation {}'.format(metrics[i]))
         ax[pos].set_xlabel('epoch')
         ax[pos].legend()
-
-    plt.tight_layout()
-    plt.show()
+    fig.tight_layout()
+    if save_to: 
+        fig.savefig(save_to)
+    else:
+        fig.show()
 
     
 def plot_image_pairs(pairs, grid, fig_shape=(15,7), save_fig=None, style='fivethirtyeight'):
