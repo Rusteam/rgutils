@@ -110,6 +110,7 @@ def pickle_data(filename, value=None, mode='w'):
     Else if mode == 'r' then reads a value from filename
     '''
     if mode == 'w':
+        assert value is not None, 'Do not overwrite filename with None'
         with open(filename, 'wb') as f:
             pkl.dump(value, f)
         return None
