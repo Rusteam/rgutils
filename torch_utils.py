@@ -27,16 +27,17 @@ class BinaryClassificationMeter(object):
 
         
     def update(self, true_labels, predicted_probs):
+        eps = 1e-6
         pred = predicted_probs >= 0.5
         true_labels = true_labels >= 0.5
         self.tp += pred.mul(true_labels).sum(0).float()
         self.tn += (1 - pred).mul(1 - true_labels).sum(0).float()
         self.fp += pred.mul(1 - true_labels).sum(0).float()
         self.fn += (1 - pred).mul(true_labels).sum(0).float()        
-        self.accuracy = ((self.tp + self.tn) / (self.tp + self.tn + self.fp + self.fn)).item()
-        self.precision = (self.tp / (self.tp + self.fp)).item()
-        self.recall = (self.tp / (self.tp + self.fn)).item()
-        self.f1_score = (2.0 * self.precision * self.recall) / (self.precision + self.recall)
+        self.accuracy = ((self.tp + self.tn) / (self.tp + self.tn + self.fp + self.fn + eps)).item()
+        self.precision = (self.tp / (self.tp + self.fp + eps)).item()
+        self.recall = (self.tp / (self.tp + self.fn + eps)).item()
+        self.f1_score = (2.0 * self.precision * self.recall) / (self.precision + self.recall + eps)
         
         
     def values(self):
