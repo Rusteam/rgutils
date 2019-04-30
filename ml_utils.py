@@ -1,6 +1,5 @@
-# coding=utf-8
 	
-from sklearn.model_selection import KFold, GridSearchCV
+from sklearn.model_selection import KFold, GridSearchCV, StratifiedKFold
 from sklearn.metrics import f1_score
 import lightgbm as lgb
 from pprint import pprint
@@ -349,14 +348,19 @@ def lgb_f1(y_true, y_predicted):
 
 
 def cross_validation(train_data, train_labels, estimator, num_folds, metric_func,
-                     model_name='model',):
+                     model_name='model', stratified=False, **kwargs):
     '''
     Performs num_folds cross-validation using estimator
     Returns a dictionary of trained models and scores
     (If using lightgbm then provide 'lgb' to estimator and 
-    make sure you imported it as "import lightgbm as lgb")
+    make sure you imported it as "import lightgbm as lgb",
+    also provide lgbm_params, num_rounds, early_stop;
+    and metric_fn should be str the same as in lgbm_params)
     '''
-    cv = KFold(n_splits=num_folds, shuffle=True, random_state=100)
+    if not stratified:
+        cv = KFold(n_splits=num_folds, shuffle=True, random_state=100)
+    else:
+        cv = StratifiedKFold(n_splits=num_folds, shuffle=True, random_state=100)
     cv_models = {}
     scores = {'train': {},
               'val': {}}
@@ -365,16 +369,23 @@ def cross_validation(train_data, train_labels, estimator, num_folds, metric_func
         X_train,y_train = train_data.iloc[train_i], train_labels.iloc[train_i]
         X_val,y_val = train_data.iloc[val_i], train_labels.iloc[val_i]
         if estimator == 'lgb':
+            assert 'lgbm_params' in kwargs.keys(), 'If estimator lgb then provide lgbm_params in kwargs'
+            assert 'num_rounds' in kwargs.keys(), 'If estimator lgb then provide num_rounds in kwargs'
+            assert 'early_stop' in kwargs.keys(), 'If estimator lgb then provide early_stop in kwargs'
             lgb_train_set = lgb.Dataset(X_train, label=y_train)
             lgb_val_set = lgb.Dataset(X_val, label=y_val)
-            booster = lgb.train(lgbm_params, lgb_train_set, 
+            booster = lgb.train(kwargs['lgbm_params'], lgb_train_set, 
                       valid_sets=[lgb_train_set, lgb_val_set], valid_names=['train','valid'],
-                      num_boost_round=NUM_ROUNDS, early_stopping_rounds=EARLY_STOP, 
-                      verbose_eval=NUM_ROUNDS//10)
+                      num_boost_round=kwargs['num_rounds'], early_stopping_rounds=kwargs['early_stop'], 
+                      verbose_eval=kwargs['num_rounds']//10)
             new_name = model_name + str(i)
             cv_models[new_name] = booster
-            scores['train'][new_name] = booster.best_score['train']['l2'] #** 0.5
-            scores['val'][new_name] = booster.best_score['valid']['l2'] #** 0.5
+            train_predicted = booster.predict(X_train)
+            val_predicted = booster.predict(X_val)
+            scores['train'][new_name] = metric_func(y_train, train_predicted)
+            scores['val'][new_name] = metric_func(y_val, val_predicted)
+#             scores['train'][new_name] = booster.best_score['train'][metric_func] #** 0.5
+#             scores['val'][new_name] = booster.best_score['valid'][metric_func] #** 0.5
         else:
             estimator.fit(X_train, y_train)
             new_name = model_name + str(i)

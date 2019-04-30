@@ -4,6 +4,7 @@ from torch import nn
 import copy
 from math import floor
 import numpy as np
+from sklearn.metrics import f1_score
 
 
 class BinaryClassificationMeter(object):
@@ -59,6 +60,8 @@ class MulticlassClassificationMeter(object):
         self.correct = 0
         self.total = 0
         self.accuracy = 0
+        self.f1_weighted = 0
+        self.batches = 0
         
         
     def update(self, true_labels, predicted_probs):
@@ -66,10 +69,13 @@ class MulticlassClassificationMeter(object):
         self.correct += torch.sum(true_labels == y_pred_labels).item()
         self.total += true_labels.size(0)
         self.accuracy = self.correct /  self.total * 100
+        self.f1_weighted += f1_score(true_labels.cpu().numpy(), y_pred_labels.cpu().numpy(), average='weighted')
+        self.batches += 1
         
         
     def values(self):
-        return {'accuracy': self.accuracy}
+        return {'accuracy': self.accuracy,
+                'f1_weighted': self.f1_weighted / self.batches}
 
         
 classification_meters = {
@@ -114,8 +120,8 @@ class Trainer():
         meter.reset()
         
         for img_data,img_labels in self.train_dataloader:
-            images = img_data.view(-1, *self.input_size).to(self.device)
-            labels = img_labels.to(self.device).float()
+            images = img_data.view(-1, *self.input_size).to(self.device, dtype=torch.float32)
+            labels = img_labels.to(self.device)
 
             y_pred = torch.squeeze(self.model(images))
             loss = self.criterion(y_pred, labels,)
@@ -144,8 +150,8 @@ class Trainer():
         data_loader = self.houldout_sets[holdout_type]
         with torch.no_grad():
             for img_data, img_labels in data_loader:
-                images = img_data.view(-1, *self.input_size).to(self.device)
-                labels = img_labels.to(self.device).float()
+                images = img_data.view(-1, *self.input_size).to(self.device, dtype=torch.float32)
+                labels = img_labels.to(self.device)
 
                 y_pred = torch.squeeze(self.model(images))
                 loss = self.criterion(y_pred, labels,)
@@ -280,7 +286,7 @@ class SimpleCNN(nn.Module):
         
                     
     def forward(self, x):
-        x = self.conv_forward(x)
+        x = self.conv_forward(x.float())
         x = x.view(-1, self.reshaped_size)
         return self.fc_forward(x)
     
