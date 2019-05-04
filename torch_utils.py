@@ -4,7 +4,7 @@ from torch import nn
 import copy
 from math import floor
 import numpy as np
-from sklearn.metrics import f1_score
+from sklearn.metrics import f1_score, recall_score, precision_score, accuracy_score
 
 
 class BinaryClassificationMeter(object):
@@ -17,35 +17,46 @@ class BinaryClassificationMeter(object):
 
         
     def reset(self):
-        self.tp = 0
-        self.tn = 0
-        self.fp = 0
-        self.fn = 0
+#        self.tp = 0
+#        self.tn = 0
+#        self.fp = 0
+#        self.fn = 0
+        self.correct = 0
+        self.total = 0
         self.accuracy = 0
         self.precision = 0
         self.recall = 0
+        self.precision = 0
         self.f1_score = 0
+        self.batches = 0
 
         
     def update(self, true_labels, predicted_probs):
-        eps = 1e-6
+#        eps = 1e-6
         pred = predicted_probs >= 0.5
         true_labels = true_labels >= 0.5
-        self.tp += pred.mul(true_labels).sum(0).float()
-        self.tn += (1 - pred).mul(1 - true_labels).sum(0).float()
-        self.fp += pred.mul(1 - true_labels).sum(0).float()
-        self.fn += (1 - pred).mul(true_labels).sum(0).float()        
-        self.accuracy = ((self.tp + self.tn) / (self.tp + self.tn + self.fp + self.fn + eps)).item()
-        self.precision = (self.tp / (self.tp + self.fp + eps)).item()
-        self.recall = (self.tp / (self.tp + self.fn + eps)).item()
-        self.f1_score = (2.0 * self.precision * self.recall) / (self.precision + self.recall + eps)
+#        self.tp += pred.mul(true_labels).sum(0).float()
+#        self.tn += (1 - pred).mul(1 - true_labels).sum(0).float()
+#        self.fp += pred.mul(1 - true_labels).sum(0).float()
+#        self.fn += (1 - pred).mul(true_labels).sum(0).float()        
+#        self.accuracy = ((self.tp + self.tn) / (self.tp + self.tn + self.fp + self.fn + eps)).item()
+#        self.precision = (self.tp / (self.tp + self.fp + eps)).item()
+#        self.recall = (self.tp / (self.tp + self.fn + eps)).item()
+#        self.f1_score = (2.0 * self.precision * self.recall) / (self.precision + self.recall + eps)
+        self.correct += torch.sum(true_labels == pred).item()
+        self.total += true_labels.size(0)
+        self.accuracy = self.correct /  self.total * 100
+        self.f1_score += f1_score(true_labels.cpu().numpy(), pred.cpu().numpy())
+        self.recall += recall_score(true_labels.cpu().numpy(), pred.cpu().numpy())
+        self.precision += precision_score(true_labels.cpu().numpy(), pred.cpu().numpy())
+        self.batches += 1
         
         
     def values(self):
         return {'accuracy': self.accuracy,
-                'f1_score': self.f1_score,
-                'precision': self.precision,
-                'recall': self.recall}
+                'f1_score': self.f1_score / self.batches,
+                'precision': self.precision / self.batches,
+                'recall': self.recall / self.batches}
         
         
 class MulticlassClassificationMeter(object):
@@ -121,7 +132,7 @@ class Trainer():
         
         for img_data,img_labels in self.train_dataloader:
             images = img_data.view(-1, *self.input_size).to(self.device, dtype=torch.float32)
-            labels = img_labels.to(self.device)
+            labels = img_labels.to(self.device).float()
 
             y_pred = torch.squeeze(self.model(images))
             loss = self.criterion(y_pred, labels,)
@@ -150,8 +161,8 @@ class Trainer():
         data_loader = self.houldout_sets[holdout_type]
         with torch.no_grad():
             for img_data, img_labels in data_loader:
-                images = img_data.view(-1, *self.input_size).to(self.device, dtype=torch.float32)
-                labels = img_labels.to(self.device)
+                images = img_data.view(-1, *self.input_size).to(self.device, dtype=torch.float32).float()
+                labels = img_labels.to(self.device).float()
 
                 y_pred = torch.squeeze(self.model(images))
                 loss = self.criterion(y_pred, labels,)
