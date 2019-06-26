@@ -1,6 +1,7 @@
 
 import torch
 from torch import nn
+from tqdm import tqdm
 import copy
 from math import floor
 import numpy as np
@@ -17,10 +18,6 @@ class BinaryClassificationMeter(object):
 
         
     def reset(self):
-#        self.tp = 0
-#        self.tn = 0
-#        self.fp = 0
-#        self.fn = 0
         self.correct = 0
         self.total = 0
         self.accuracy = 0
@@ -32,17 +29,8 @@ class BinaryClassificationMeter(object):
 
         
     def update(self, true_labels, predicted_probs):
-#        eps = 1e-6
         pred = predicted_probs >= 0.5
         true_labels = true_labels >= 0.5
-#        self.tp += pred.mul(true_labels).sum(0).float()
-#        self.tn += (1 - pred).mul(1 - true_labels).sum(0).float()
-#        self.fp += pred.mul(1 - true_labels).sum(0).float()
-#        self.fn += (1 - pred).mul(true_labels).sum(0).float()        
-#        self.accuracy = ((self.tp + self.tn) / (self.tp + self.tn + self.fp + self.fn + eps)).item()
-#        self.precision = (self.tp / (self.tp + self.fp + eps)).item()
-#        self.recall = (self.tp / (self.tp + self.fn + eps)).item()
-#        self.f1_score = (2.0 * self.precision * self.recall) / (self.precision + self.recall + eps)
         self.correct += torch.sum(true_labels == pred).item()
         self.total += true_labels.size(0)
         self.accuracy = self.correct /  self.total * 100
@@ -105,7 +93,8 @@ class Trainer():
     model, history = trainer.run_training(num_epoch, ['accuracy','f1_score', 'precision', 'recall'],)
     '''
     def __init__(self, classification, model, optimizer, criterion, device, input_size,
-                 train_dataloader, val_dataloader, test_dataloader=None):
+                 train_dataloader, val_dataloader, test_dataloader=None,
+                 tqdm_off=True):
         self.classification = classification
         self.model = model
         self.optimizer = optimizer
@@ -116,6 +105,7 @@ class Trainer():
         self.train_dataloader = train_dataloader
         self.houldout_sets = {'val': val_dataloader,
                               'test': test_dataloader}
+        self.tqdm_off = tqdm_off
             
 
     def train_epoch(self,):
@@ -132,7 +122,8 @@ class Trainer():
         
         for img_data,img_labels in self.train_dataloader:
             images = img_data.view(-1, *self.input_size).to(self.device, dtype=torch.float32)
-            labels = img_labels.to(self.device).float()
+            labels_dtype = torch.long if self.classification == 'multi' else torch.float32
+            labels = img_labels.to(self.device, dtype=labels_dtype)
 
             y_pred = torch.squeeze(self.model(images))
             loss = self.criterion(y_pred, labels,)
@@ -161,8 +152,9 @@ class Trainer():
         data_loader = self.houldout_sets[holdout_type]
         with torch.no_grad():
             for img_data, img_labels in data_loader:
-                images = img_data.view(-1, *self.input_size).to(self.device, dtype=torch.float32).float()
-                labels = img_labels.to(self.device).float()
+                images = img_data.view(-1, *self.input_size).to(self.device, dtype=torch.float32)
+                labels_dtype = torch.long if self.classification == 'multi' else torch.float32
+                labels = img_labels.to(self.device, dtype=labels_dtype)
 
                 y_pred = torch.squeeze(self.model(images))
                 loss = self.criterion(y_pred, labels,)
@@ -194,7 +186,7 @@ class Trainer():
         best_val_loss = 1e6
                 
         # train for given number of epochs
-        for ep in range(start_epoch, num_epoch):               
+        for ep in tqdm(range(start_epoch, num_epoch), disable=self.tqdm_off):               
             # make 1 run thru training data, compute and save scores
             train_loss, train_meter = self.train_epoch()
             val_loss, val_meter = self.eval_model('val')
