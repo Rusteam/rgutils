@@ -125,7 +125,7 @@ class Trainer():
             labels_dtype = torch.long if self.classification == 'multi' else torch.float32
             labels = img_labels.to(self.device, dtype=labels_dtype)
 
-            y_pred = torch.squeeze(self.model(images))
+            y_pred = torch.squeeze(self.model(images), dim=1)
             loss = self.criterion(y_pred, labels,)
             
             meter.update(labels, y_pred)
@@ -156,7 +156,7 @@ class Trainer():
                 labels_dtype = torch.long if self.classification == 'multi' else torch.float32
                 labels = img_labels.to(self.device, dtype=labels_dtype)
 
-                y_pred = torch.squeeze(self.model(images))
+                y_pred = torch.squeeze(self.model(images), dim=1)
                 loss = self.criterion(y_pred, labels,)
 
                 meter.update(labels, y_pred)
@@ -166,7 +166,8 @@ class Trainer():
         return val_loss, meter.values()
 
 
-    def run_training(self, num_epoch, monitor_metrics, history=None, print_stats=True):
+    def run_training(self, num_epoch, monitor_metrics, early_stopping=None, 
+                     history=None, print_stats=True):
         '''
         Runs training for a specified number of epochs
         '''
@@ -184,7 +185,7 @@ class Trainer():
         # store best model weights
         best_model_weights = copy.deepcopy(self.model.state_dict())
         best_val_loss = 1e6
-                
+        no_improvement = 0
         # train for given number of epochs
         for ep in tqdm(range(start_epoch, num_epoch), disable=self.tqdm_off):               
             # make 1 run thru training data, compute and save scores
@@ -208,6 +209,15 @@ class Trainer():
             if val_loss < best_val_loss:
                 best_model_weights = copy.deepcopy(self.model.state_dict())
                 best_val_loss = val_loss
+                no_improvement = 0
+            else:
+                no_improvement += 1
+                
+            # early stopping if specified
+            if early_stopping:
+                if no_improvement >= early_stopping:
+                    print(f'Early stopping at {ep} epoch')
+                    break
                
         self.model.load_state_dict(best_model_weights)
         return self.model, history

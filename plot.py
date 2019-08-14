@@ -4,7 +4,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import seaborn as sns
-from PIL import Image
+
 
 def image_labels_grid(n_row, n_col, image_data, fig_dims=(12,8), 
                       plot_style='seaborn-white', width_space=0.4, height_space=0.1,
@@ -13,20 +13,26 @@ def image_labels_grid(n_row, n_col, image_data, fig_dims=(12,8),
     Plots random images with labels for a dataset with methods __len__ & __getitem__
     (Two values for each index: an image and its label)
     '''
-    plt.style.use(plot_style)
-    rand_indices = np.random.randint(low=0, high=len(image_data), size=(n_row, n_col))
-    fig,ax = plt.subplots(n_row, n_col, sharex=True, sharey=True, squeeze=False, 
+    num_show = n_row * n_col
+    assert len(image_data) >= num_show, 'Number of images should be more than n_row*n_col'
+    show_indices = np.random.randint(low=0, high=len(image_data), 
+                                         size=(n_row, n_col))
+    plt.style.use(plot_style)    
+    fig,ax = plt.subplots(n_row, n_col, sharex=False, sharey=False, squeeze=False, 
                           figsize=fig_dims)
+    _ = [a.axis('off') for a in ax.ravel()]
     fig.subplots_adjust(hspace=height_space, wspace=width_space)
     for r in range(n_row):
         for c in range(n_col):
-            ax[r, c].imshow(image_data[rand_indices[r,c]][0])
-            ax[r, c].set_title('Label: ' + str(image_data[rand_indices[r,c]][1]))
-    
+            img = image_data[show_indices[r,c]][0]
+            if isinstance(img, (str,)):
+                img = plt.imread(img)
+            ax[r, c].imshow(img)
+            ax[r, c].set_title('Label: ' + str(image_data[show_indices[r,c]][1]))
     if save_fig:
         plt.savefig(save_fig)
     plt.show()
-
+    
     
 def plot_learning_curve(history, metrics=['loss','accuracy'], train=True, val=True,
                         grid=(1,2), fig_shape=(12,4), plot_style='fivethirtyeight', 
@@ -107,14 +113,37 @@ def show_images(image_paths, n_row, n_col, fig_dims=(12,8),
     '''
     Show images from the list of image_paths
     '''
+    num_show = n_row * n_col
+    assert len(image_paths) >= num_show, 'Number of images should be more than n_row*n_col'
+    image_paths = np.random.choice(image_paths, size=(n_row, n_col))
     plt.style.use(plot_style)
-    fig,ax = plt.subplots(n_row, n_col, sharex=True, sharey=True, squeeze=False, 
+    fig,ax = plt.subplots(n_row, n_col, sharex=False, sharey=False, squeeze=False, 
                           figsize=fig_dims)
+    _ = [a.axis('off') for a in ax.ravel()]
     fig.subplots_adjust(hspace=spaces[1], wspace=spaces[0])
     for r in range(n_row):
         for c in range(n_col):
-            img = Image.open(image_paths[r*(c+1)+c])
+            img = image_paths[r,c]
+            if isinstance(img, (str,)):
+                img = plt.imread(img)
             ax[r, c].imshow(img)
+    if save_fig:
+        plt.savefig(save_fig)
+    plt.show()
+    
+
+def histograms(data_dict, n_row, n_col, fig_dims=None, save_fig=None):
+    '''
+    Plot multiple histograms for a data_dict
+    Where keys are titles and values are arrays
+    '''
+    if not fig_dims:
+        fig_dims = (n_col * 4, n_row * 3)
+    fig,axes = plt.subplots(n_row, n_col, squeeze=False, figsize=fig_dims)
+    for c,(k,v) in enumerate(data_dict.items()):
+        row_num,col_num = divmod(c, n_col)
+        sns.distplot(v, ax=axes[row_num, col_num])
+        axes[row_num, col_num].set_title(k)
     if save_fig:
         plt.savefig(save_fig)
     plt.show()
