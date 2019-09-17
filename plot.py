@@ -132,7 +132,7 @@ def show_images(image_paths, n_row, n_col, fig_dims=(12,8),
     plt.show()
     
 
-def histograms(data_dict, n_row, n_col, fig_dims=None, save_fig=None):
+def histograms(data_dict, n_row, n_col, fig_dims=None, save_fig=None, **kwargs):
     '''
     Plot multiple histograms for a data_dict
     Where keys are titles and values are arrays
@@ -142,7 +142,28 @@ def histograms(data_dict, n_row, n_col, fig_dims=None, save_fig=None):
     fig,axes = plt.subplots(n_row, n_col, squeeze=False, figsize=fig_dims)
     for c,(k,v) in enumerate(data_dict.items()):
         row_num,col_num = divmod(c, n_col)
-        sns.distplot(v, ax=axes[row_num, col_num])
+        sns.distplot(v, ax=axes[row_num, col_num], **kwargs)
+        axes[row_num, col_num].set_title(k)
+    if save_fig:
+        plt.savefig(save_fig)
+    plt.show()
+
+
+def barplots(data_dict, n_row, n_col, horizontal=True, fig_dims=None, save_fig=None, **kwargs):
+    '''
+    Plot multiple histograms for a data_dict
+    Where keys are titles and values are arrays
+    '''
+    if not fig_dims:
+        fig_dims = (n_col * 4, n_row * 3)
+    fig,axes = plt.subplots(n_row, n_col, squeeze=False, figsize=fig_dims)
+    for c,(k,v) in enumerate(data_dict.items()):
+        row_num,col_num = divmod(c, n_col)
+        labs,cnts = np.unique(v, return_counts=True)
+        if horizontal:
+            sns.barplot(y=labs, x=cnts, ax=axes[row_num, col_num], **kwargs)
+        else:
+            sns.barplot(x=labs, y=cnts, ax=axes[row_num, col_num], **kwargs)
         axes[row_num, col_num].set_title(k)
     if save_fig:
         plt.savefig(save_fig)

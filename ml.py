@@ -173,6 +173,19 @@ def mark_anomaly(data, features_normal, agg_funcs=['sum'], suffix='outlier', pri
     return data
 
 
+def pairwised_distributions(data, index_column, value_column):
+    '''
+    Create a dict with unique keys from index column
+    and its subset of value column in data table
+    '''
+    indices = data[index_column].unique()
+    data_dict = {}
+    for ind in indices:
+        subset = data[data[index_column] == ind]
+        data_dict[ind] = subset[value_column]
+    return data_dict
+
+
 def calc_shares(numeric_feature, category_feature, id_colname, data, 
                percentage=True, absolute=True, suffix='', eps=1e-4):
     '''
