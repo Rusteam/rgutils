@@ -361,7 +361,8 @@ def lgb_f1(y_true, y_predicted):
 
 
 def cross_validation(train_data, train_labels, estimator, num_folds, metric_func,
-                     model_name='model', stratified=False, **kwargs):
+                     model_name='model', stratified=False, **kwargs
+                     ):
     '''
     Performs num_folds cross-validation using estimator
     Returns a dictionary of trained models and scores
@@ -378,9 +379,15 @@ def cross_validation(train_data, train_labels, estimator, num_folds, metric_func
     scores = {'train': {},
               'val': {}}
 
-    for i,(train_i,val_i) in enumerate(cv.split(train_data)):
-        X_train,y_train = train_data.iloc[train_i], train_labels.iloc[train_i]
-        X_val,y_val = train_data.iloc[val_i], train_labels.iloc[val_i]
+    for i,(train_i,val_i) in enumerate(cv.split(train_data, train_labels)):
+        if isinstance(train_data, (pd.core.frame.DataFrame, pd.core.series.Series)):
+            X_train,y_train = train_data.iloc[train_i], train_labels.iloc[train_i]
+            X_val,y_val = train_data.iloc[val_i], train_labels.iloc[val_i]
+        elif isinstance(train_data, (np.ndarray,)):
+            X_train,y_train = train_data[train_i], train_labels[train_i]
+            X_val,y_val = train_data[val_i], train_labels[val_i]
+        else:
+            raise Exception('Passed data not pd.DataFrame, pd.Series or np.ndarray')
         if estimator == 'lgb':
             assert 'lgbm_params' in kwargs.keys(), 'If estimator lgb then provide lgbm_params in kwargs'
             assert 'num_rounds' in kwargs.keys(), 'If estimator lgb then provide num_rounds in kwargs'
@@ -410,7 +417,7 @@ def cross_validation(train_data, train_labels, estimator, num_folds, metric_func
     return cv_models, scores
 
 
-def cv_predict(cv_models, x_data, inference_params=None):
+def cv_predict(cv_models, x_data):
     '''
     Makes average prediction cross-validated models
     '''
@@ -477,4 +484,5 @@ def reduce_dimensions(algorithm, data):
     Reduce dimensions of training data
     '''
     algorithm.fit(data,)
+    print(f'Explained variance ratio {algorithm.explained_variance_ratio_.sum():.3f}')
     return algorithm, algorithm.transform(data)
