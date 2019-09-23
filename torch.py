@@ -47,7 +47,7 @@ class BinaryClassificationMeter(object):
                 'recall': self.recall / self.batches}
         
         
-class MulticlassClassificationMeter(object):
+class MulticlassClassificationMeter:
     '''
     Computes multi-class accuracy
     '''
@@ -60,6 +60,7 @@ class MulticlassClassificationMeter(object):
         self.total = 0
         self.accuracy = 0
         self.f1_weighted = 0
+        self.f1_macro = 0
         self.batches = 0
         
         
@@ -69,12 +70,15 @@ class MulticlassClassificationMeter(object):
         self.total += true_labels.size(0)
         self.accuracy = self.correct /  self.total * 100
         self.f1_weighted += f1_score(true_labels.cpu().numpy(), y_pred_labels.cpu().numpy(), average='weighted')
+        self.f1_macro += f1_score(true_labels.cpu().numpy(), y_pred_labels.cpu().numpy(), average='macro')
         self.batches += 1
         
         
     def values(self):
         return {'accuracy': self.accuracy,
-                'f1_weighted': self.f1_weighted / self.batches}
+                'f1_weighted': self.f1_weighted / self.batches,
+                'f1_macro': self.f1_macro / self.batches,
+                }
 
         
 classification_meters = {
@@ -91,6 +95,8 @@ class Trainer():
     trainer = Trainer('binary', net, optimizer, criterion, device, input_dims, 
                   train_loader, val_loader, test_loader)
     model, history = trainer.run_training(num_epoch, ['accuracy','f1_score', 'precision', 'recall'],)
+
+    Note: to resume training, run trainer.run_training() and it will return aggregate history
     '''
     def __init__(self, classification, model, optimizer, criterion, device, input_size,
                  train_dataloader, val_dataloader, test_dataloader=None,
@@ -106,6 +112,7 @@ class Trainer():
         self.houldout_sets = {'val': val_dataloader,
                               'test': test_dataloader}
         self.tqdm_off = tqdm_off
+        self.history = None
             
 
     def train_epoch(self,):
@@ -171,9 +178,10 @@ class Trainer():
         '''
         Runs training for a specified number of epochs
         '''
-        # initialize history if not given
-        if history is not None:
-            start_epoch = max(history['epoch']) + 1
+        # if running again then add up to a history
+        if self.history is not None:
+            history = copy.deepcopy(self.history)
+            start_epoch = max(self.history['epoch']) + 1
             num_epoch = num_epoch + start_epoch
         else:
             history = {'epoch': [], 'train_loss': [], 'val_loss': []}
@@ -220,6 +228,7 @@ class Trainer():
                     break
                
         self.model.load_state_dict(best_model_weights)
+        self.history = copy.deepcopy(history)
         return self.model, history
 
 

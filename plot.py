@@ -159,7 +159,11 @@ def barplots(data_dict, n_row, n_col, horizontal=True, fig_dims=None, save_fig=N
     fig,axes = plt.subplots(n_row, n_col, squeeze=False, figsize=fig_dims)
     for c,(k,v) in enumerate(data_dict.items()):
         row_num,col_num = divmod(c, n_col)
-        labs,cnts = np.unique(v, return_counts=True)
+        seq_types = (list,tuple,np.ndarray,pd.core.series.Series)
+        if len(v) == 2 and isinstance(v[0], seq_types) and isinstance(v[1], seq_types):
+            labs,cnts = v
+        else:
+            labs,cnts = np.unique(v, return_counts=True)
         if horizontal:
             sns.barplot(y=labs, x=cnts, ax=axes[row_num, col_num], **kwargs)
         else:
