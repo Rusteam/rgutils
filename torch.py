@@ -3,6 +3,7 @@ import torch
 from torch import nn
 from tqdm import tqdm
 import copy
+import re
 from math import floor
 import numpy as np
 from sklearn.metrics import f1_score, recall_score, precision_score, accuracy_score
@@ -99,7 +100,7 @@ class Trainer():
     Note: to resume training, run trainer.run_training() and it will return aggregate history
     '''
     def __init__(self, classification, model, optimizer, criterion, device, input_size,
-                 train_dataloader, val_dataloader, test_dataloader=None,
+                 train_dataloader, val_dataloader, test_dataloader=None, data_dtype=torch.float32,
                  tqdm_off=True):
         self.classification = classification
         self.model = model
@@ -113,6 +114,7 @@ class Trainer():
                               'test': test_dataloader}
         self.tqdm_off = tqdm_off
         self.history = None
+        self.data_dtype = data_dtype
             
 
     def train_epoch(self,):
@@ -128,7 +130,7 @@ class Trainer():
         meter.reset()
         
         for img_data,img_labels in self.train_dataloader:
-            images = img_data.view(-1, *self.input_size).to(self.device, dtype=torch.float32)
+            images = img_data.view(-1, *self.input_size).to(self.device, dtype=self.data_dtype)
             labels_dtype = torch.long if self.classification == 'multi' else torch.float32
             labels = img_labels.to(self.device, dtype=labels_dtype)
 
@@ -159,7 +161,7 @@ class Trainer():
         data_loader = self.houldout_sets[holdout_type]
         with torch.no_grad():
             for img_data, img_labels in data_loader:
-                images = img_data.view(-1, *self.input_size).to(self.device, dtype=torch.float32)
+                images = img_data.view(-1, *self.input_size).to(self.device, dtype=self.data_dtype)
                 labels_dtype = torch.long if self.classification == 'multi' else torch.float32
                 labels = img_labels.to(self.device, dtype=labels_dtype)
 
@@ -174,37 +176,63 @@ class Trainer():
 
 
     def run_training(self, num_epoch, monitor_metrics, early_stopping=None, 
-                     history=None, print_stats=True):
+                     unfreeze_after=None, unfreeze_options=None, mlflow_tracking=None,
+                     print_stats=True):
         '''
         Runs training for a specified number of epochs
         '''
+        if mlflow_tracking:
+            tracking_keys = {'params':dict, 'name':str}
+            for k,tp in tracking_keys.items():
+                assert k in list(mlflow_tracking.keys()) \
+                        and isinstance(mlflow_tracking[k], tp), f'{k}:{tp} should be in mlflow_tracking argument'
+            import mlflow # only import if needed, no need to install it if not required
+            mlflow.set_experiment(mlflow_tracking['name'])
         # if running again then add up to a history
-        if self.history is not None:
+        if unfreeze_after:
+            assert unfreeze_options is not None, 'If using unfreeze provide unfreeze options as well (could be empty dict)'
+        if self.history is not None: #resumes training
             history = copy.deepcopy(self.history)
             start_epoch = max(self.history['epoch']) + 1
             num_epoch = num_epoch + start_epoch
+            if mlflow_tracking:
+                mlflow.start_run(self.mlflow_run.info.run_id)
         else:
             history = {'epoch': [], 'train_loss': [], 'val_loss': []}
             for metr in monitor_metrics:
                 history['_'.join(['train',metr])] = []
                 history['_'.join(['val',metr])] = []
             start_epoch = 0
+            if mlflow_tracking:
+                self.mlflow_run = mlflow.start_run()
+                mlflow.log_params(mlflow_tracking['params'])
             
         # store best model weights
         best_model_weights = copy.deepcopy(self.model.state_dict())
         best_val_loss = 1e6
         no_improvement = 0
         # train for given number of epochs
-        for ep in tqdm(range(start_epoch, num_epoch), disable=self.tqdm_off):               
+        for ep in tqdm(range(start_epoch, num_epoch), disable=self.tqdm_off):
+            # unfreeze layers if it is a time
+            if ep == unfreeze_after:
+                unfreeze_layers(self.model, **unfreeze_options)
+                parameter_number(self.model)
             # make 1 run thru training data, compute and save scores
             train_loss, train_meter = self.train_epoch()
             val_loss, val_meter = self.eval_model('val')
             history['epoch'].append(ep)
             history['train_loss'].append(train_loss), history['val_loss'].append(val_loss)
+            mlflow_metrics = {'train_loss': train_loss, 'val_loss': val_loss}
             for metr in monitor_metrics:
-                history['_'.join(['train',metr])].append(train_meter[metr])
-                history['_'.join(['val',metr])].append(val_meter[metr])
-            
+                t_n = '_'.join(['train',metr])
+                history[t_n].append(train_meter[metr])
+                v_n = '_'.join(['val',metr])
+                history[v_n].append(val_meter[metr])
+                # add to mlflow dict
+                mlflow_metrics.update({t_n: train_meter[metr], v_n: val_meter[metr]})
+            # log params
+            if mlflow_tracking:
+                mlflow.log_metrics(mlflow_metrics, step=ep)
             # print stats if requested
             if print_stats:
                 print('='*10, 'Epoch', ep, '='*10)
@@ -212,7 +240,6 @@ class Trainer():
                 print('Train %.4f | %.3f' % (train_loss, train_meter['accuracy']))
                 print('Valid %.4f | %.3f' % (val_loss, val_meter['accuracy']))
                 print()
-                
             # store weights for best model
             if val_loss < best_val_loss:
                 best_model_weights = copy.deepcopy(self.model.state_dict())
@@ -220,13 +247,13 @@ class Trainer():
                 no_improvement = 0
             else:
                 no_improvement += 1
-                
             # early stopping if specified
             if early_stopping:
                 if no_improvement >= early_stopping:
                     print(f'Early stopping at {ep} epoch')
                     break
-               
+        if mlflow_tracking:
+            mlflow.end_run()
         self.model.load_state_dict(best_model_weights)
         self.history = copy.deepcopy(history)
         return self.model, history
@@ -338,3 +365,19 @@ def autoencoder_output(model, data_loader, num_show, input_dim, output_dim, devi
         y_out = np.array(y.view(*output_dim).detach())
         paired_arrays.append([x_out, y_out])
     return np.array(paired_arrays)
+
+
+def unfreeze_layers(model, include_pattern=None, except_pattern=None):
+    '''
+    Unfreeze all layers for training
+    If including is specified then only those (first test)
+    If excluding is specified then all except those (second test)
+    '''
+    for n,p in model.named_parameters():
+        if include_pattern or except_pattern:
+            if include_pattern and re.search(include_pattern, n) is not None:
+                p.requires_grad = True
+            if except_pattern and re.search(except_pattern, n) is not None:
+                p.requires_grad = False
+        else:
+            p.requires_grad = True

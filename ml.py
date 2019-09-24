@@ -478,7 +478,6 @@ def quick_ml(models, train_data, val_data, metric_fn):
     return trained,scores
 
 
-
 def reduce_dimensions(algorithm, data):
     '''
     Reduce dimensions of training data
