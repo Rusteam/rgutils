@@ -1,12 +1,17 @@
 
 import torch
-from torch import nn
+from torch import nn, optim
 from tqdm import tqdm
 import copy
 import re
 from math import floor
 import numpy as np
 from sklearn.metrics import f1_score, recall_score, precision_score, accuracy_score
+for mod in ['mlflow',]:
+    try:
+        exec(f'import {mod}')
+    except ImportError as e:
+        print(e)
 
 
 class BinaryClassificationMeter(object):
@@ -93,18 +98,36 @@ class Trainer():
     Trains a model for specified number of epochs and evaluates
     ------
     Usage:
-    trainer = Trainer('binary', net, optimizer, criterion, device, input_dims, 
-                  train_loader, val_loader, test_loader)
-    model, history = trainer.run_training(num_epoch, ['accuracy','f1_score', 'precision', 'recall'],)
+    trainer = Trainer(**training_configs)
+    model, history = trainer.run_training(**running_configs)
 
     Note: to resume training, run trainer.run_training() and it will return aggregate history
     '''
     def __init__(self, classification, model, optimizer, criterion, device, input_size,
                  train_dataloader, val_dataloader, test_dataloader=None, data_dtype=torch.float32,
+                 mlflow_tracking=None,
                  tqdm_off=True):
+        '''
+        Set training configs:
+            classification - binary or multi
+            model - neural net itself
+            optimizer - either torch.optim.Optimizer or (Optimizer str, {lr: f, ...})
+            criterion - loss function
+            device - torch.device object: cuda or cpu
+            input_size - input size to a model
+            train_dataloader, val_dataloader, test_dataloader - data loaders, test could be omitted
+            data_dtype - convert X to this type before passing to the model
+            mlflow_tracking - provide configs for using mlflow tracking api: {name: expirement name, params: training configs}
+            tqdm_off - hide or unhide tqdm for epoch tracking
+        '''
         self.classification = classification
         self.model = model
-        self.optimizer = optimizer
+        if isinstance(optimizer, (list,tuple)):
+            assert len(optimizer) == 2, f'Provide optimizer as a tuple of (Name, {kwargs})'
+            trainable_parameters = filter(lambda x: x.requires_grad, self.model.parameters())
+            self.optimizer = getattr(optim, optimizer[0])(trainable_parameters, **optimizer[1])
+        else:
+            self.optimizer = optimizer
         self.criterion = criterion
         self.device = device
         self.input_size = input_size
@@ -115,6 +138,16 @@ class Trainer():
         self.tqdm_off = tqdm_off
         self.history = None
         self.data_dtype = data_dtype
+
+        if mlflow_tracking:
+            tracking_keys = {'params':dict, 'name':str}
+            for k,tp in tracking_keys.items():
+                assert k in list(mlflow_tracking.keys()) \
+                        and isinstance(mlflow_tracking[k], tp), f'{k}:{tp} should be in mlflow_tracking argument'
+            mlflow.set_experiment(mlflow_tracking['name'])
+            self.mlflow_tracking = mlflow_tracking
+        else:
+            self.mlflow_tracking = None
             
 
     def train_epoch(self,):
@@ -175,27 +208,33 @@ class Trainer():
         return val_loss, meter.values()
 
 
-    def run_training(self, num_epoch, monitor_metrics, early_stopping=None, 
-                     unfreeze_after=None, unfreeze_options=None, mlflow_tracking=None,
+    def run_training(self, num_epoch, monitor_metrics, early_stopping=None, best_metric='loss',
+                     unfreeze_after=None, unfreeze_options=None, unfreeze_optim=None,
                      print_stats=True):
         '''
         Runs training for a specified number of epochs
+        If called again, resumes traning
+        -------
+        Params:
+            num_epoch - number of epochs to train for
+            monitor_metrics - list of metrics to minotor
+            early_stopping - number of epochs to wait before stopping if best metric does not improve
+            best_metric - a metric to choose best weights and used in early stopping
+            unfreeze_after - unfreeze layers during training
+            unfreeze_options - add inclusion or exclusion patterns for unfreezing layers
+            unfreeze_optim - optimizer to use for newly unfreezed layers
+        Returns:
+            trained model, history
         '''
-        if mlflow_tracking:
-            tracking_keys = {'params':dict, 'name':str}
-            for k,tp in tracking_keys.items():
-                assert k in list(mlflow_tracking.keys()) \
-                        and isinstance(mlflow_tracking[k], tp), f'{k}:{tp} should be in mlflow_tracking argument'
-            import mlflow # only import if needed, no need to install it if not required
-            mlflow.set_experiment(mlflow_tracking['name'])
         # if running again then add up to a history
+        assert best_metric == 'loss' or best_metric in monitor_metrics
         if unfreeze_after:
             assert unfreeze_options is not None, 'If using unfreeze provide unfreeze options as well (could be empty dict)'
         if self.history is not None: #resumes training
             history = copy.deepcopy(self.history)
             start_epoch = max(self.history['epoch']) + 1
             num_epoch = num_epoch + start_epoch
-            if mlflow_tracking:
+            if self.mlflow_tracking:
                 mlflow.start_run(self.mlflow_run.info.run_id)
         else:
             history = {'epoch': [], 'train_loss': [], 'val_loss': []}
@@ -203,19 +242,27 @@ class Trainer():
                 history['_'.join(['train',metr])] = []
                 history['_'.join(['val',metr])] = []
             start_epoch = 0
-            if mlflow_tracking:
+            if self.mlflow_tracking:
                 self.mlflow_run = mlflow.start_run()
-                mlflow.log_params(mlflow_tracking['params'])
-            
+                mlflow.log_params(self.mlflow_tracking['params'])
         # store best model weights
         best_model_weights = copy.deepcopy(self.model.state_dict())
-        best_val_loss = 1e6
+        best_val_score = 1e6
         no_improvement = 0
         # train for given number of epochs
         for ep in tqdm(range(start_epoch, num_epoch), disable=self.tqdm_off):
-            # unfreeze layers if it is a time
+            # unfreeze layers if it is a time and update optimizer
             if ep == unfreeze_after:
                 unfreeze_layers(self.model, **unfreeze_options)
+                if unfreeze_optim:
+                    assert isinstance(unfreeze_optim, (tuple,list)) and len(unfreeze_optim) == 2, \
+                                f'Provide unfreeze_optimizer as a tuple of (Name, {kwargs})'
+                    trainable_parameters = filter(lambda x: x.requires_grad, self.model.parameters())
+                    old_sd = self.optimizer.state_dict()
+                    self.optimizer = getattr(optim, unfreeze_optim[0])(trainable_parameters, **unfreeze_optim[1])
+                    new_sd = self.optimizer.state_dict()
+                    new_sd['state'].update(old_sd['state'])
+                    self.optimizer.load_state_dict(new_sd)
                 parameter_number(self.model)
             # make 1 run thru training data, compute and save scores
             train_loss, train_meter = self.train_epoch()
@@ -231,7 +278,7 @@ class Trainer():
                 # add to mlflow dict
                 mlflow_metrics.update({t_n: train_meter[metr], v_n: val_meter[metr]})
             # log params
-            if mlflow_tracking:
+            if self.mlflow_tracking:
                 mlflow.log_metrics(mlflow_metrics, step=ep)
             # print stats if requested
             if print_stats:
@@ -241,9 +288,12 @@ class Trainer():
                 print('Valid %.4f | %.3f' % (val_loss, val_meter['accuracy']))
                 print()
             # store weights for best model
-            if val_loss < best_val_loss:
+            val_score = history[f'val_{best_metric}'][-1]
+            if best_metric != 'loss':
+                val_score = val_score * (-1)
+            if val_score < best_val_score:
                 best_model_weights = copy.deepcopy(self.model.state_dict())
-                best_val_loss = val_loss
+                best_val_score = val_score
                 no_improvement = 0
             else:
                 no_improvement += 1
@@ -252,9 +302,23 @@ class Trainer():
                 if no_improvement >= early_stopping:
                     print(f'Early stopping at {ep} epoch')
                     break
-        if mlflow_tracking:
-            mlflow.end_run()
+        # get best model
         self.model.load_state_dict(best_model_weights)
+        # run test metrics
+        if self.houldout_sets['test'] is not None:
+            test_loss,test_results = self.eval_model(holdout_type='test')
+            history['test_results'] = (test_loss,test_results)
+            print()
+            print('='*20)
+            print(f'Test loss {test_loss:.4f}')
+            print('Test results:', test_results)
+        # log test and end run
+        if self.mlflow_tracking:
+            if self.houldout_sets['test'] is not None:
+                test_results = {f'test_{k}':round(v,4) for k,v in test_results.items()}
+                test_results.update({'test_loss':test_loss})
+                mlflow.log_metrics(test_results)
+            mlflow.end_run()
         self.history = copy.deepcopy(history)
         return self.model, history
 
