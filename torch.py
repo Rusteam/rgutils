@@ -105,7 +105,7 @@ class Trainer():
     '''
     def __init__(self, classification, model, optimizer, criterion, device, input_size,
                  train_dataloader, val_dataloader, test_dataloader=None, data_dtype=torch.float32,
-                 mlflow_tracking=None,
+                 mlflow_tracking=None, lr_scheduler=None,
                  tqdm_off=True):
         '''
         Set training configs:
@@ -122,12 +122,17 @@ class Trainer():
         '''
         self.classification = classification
         self.model = model
+        # create optimizer if not given, create scheduler if so
         if isinstance(optimizer, (list,tuple)):
             assert len(optimizer) == 2, f'Provide optimizer as a tuple of (Name, {kwargs})'
+            assert isinstance(lr_scheduler, (list,tuple)) and len(lr_scheduler) == 2, \
+                                    f'Scheduler should look like optimizer'
             trainable_parameters = filter(lambda x: x.requires_grad, self.model.parameters())
             self.optimizer = getattr(optim, optimizer[0])(trainable_parameters, **optimizer[1])
+            self.lr_scheduler = getattr(optim.lr_scheduler, lr_scheduler[0])(self.optimizer, **lr_scheduler[1])
         else:
             self.optimizer = optimizer
+            self.lr_scheduler = lr_scheduler
         self.criterion = criterion
         self.device = device
         self.input_size = input_size
@@ -138,7 +143,6 @@ class Trainer():
         self.tqdm_off = tqdm_off
         self.history = None
         self.data_dtype = data_dtype
-
         if mlflow_tracking:
             tracking_keys = {'params':dict, 'name':str}
             for k,tp in tracking_keys.items():
@@ -176,6 +180,8 @@ class Trainer():
             self.optimizer.zero_grad()
             loss.backward()
             self.optimizer.step()
+        if self.lr_scheduler:
+            self.lr_scheduler.step()
 
         epoch_loss = running_loss / len(self.train_dataloader.dataset)
         return epoch_loss, meter.values()
