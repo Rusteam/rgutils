@@ -254,18 +254,17 @@ def search_grid(model, X_data, y_data, search_space, metric, num_folds, metric_f
                         n_jobs=-1, return_train_score=True)
     grid.fit(X_data, y_data)
     best_index = grid.best_index_
-    val_score = grid.best_score_
-    val_mean = grid.cv_results_['mean_test_score'].mean()
+    best_val_score = grid.best_score_
+    best_std = grid.cv_results_['std_test_score'][best_index]
     train_score = grid.cv_results_['mean_train_score'][best_index]
     if metric_func is not None:
         train_score = metric_func(train_score)
-        val_score = metric_func(val_score)
-        val_mean = metric_func(val_mean)
+        best_val_score = metric_func(best_val_score)
     print('='*5, ' Grid Search Results ', '='*5)
     print('Best parameters are:')
     pprint(grid.best_params_)
     print('Best train score %.4f, validation %.4f (mean val %.4f)' % 
-                          (train_score, val_score, val_mean))
+                          (train_score, best_val_score, best_std))
     print('='*33)
     return grid.best_estimator_, grid.best_params_
 
