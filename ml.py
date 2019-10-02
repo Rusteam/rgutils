@@ -7,6 +7,7 @@ from datetime import datetime as dt
 import pandas as pd
 import numpy as np
 import copy
+from tqdm import tqdm
 
 
 def get_date_range(ym_series):
@@ -378,7 +379,7 @@ def cross_validation(train_data, train_labels, estimator, num_folds, metric_func
     scores = {'train': {},
               'val': {}}
 
-    for i,(train_i,val_i) in enumerate(cv.split(train_data, train_labels)):
+    for i,(train_i,val_i) in tqdm(enumerate(cv.split(train_data, train_labels)), desc='Folds'):
         if isinstance(train_data, (pd.core.frame.DataFrame, pd.core.series.Series)):
             X_train,y_train = train_data.iloc[train_i], train_labels.iloc[train_i]
             X_val,y_val = train_data.iloc[val_i], train_labels.iloc[val_i]
