@@ -478,9 +478,11 @@ def quick_ml(models, train_data, val_data, metric_fn):
     return trained,scores
 
 
-def reduce_dimensions(algorithm, data):
+def reduce_dimensions(algorithm, data,):
     '''
     Reduce dimensions of training data
+    -----
+    Return fitted algorithm and decomposed data
     '''
     algorithm.fit(data,)
     print(f'Explained variance ratio {algorithm.explained_variance_ratio_.sum():.3f}')

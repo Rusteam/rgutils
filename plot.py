@@ -140,6 +140,8 @@ def histograms(data_dict, n_row, n_col, fig_dims=None, save_fig=None, **kwargs):
     if not fig_dims:
         fig_dims = (n_col * 4, n_row * 3)
     fig,axes = plt.subplots(n_row, n_col, squeeze=False, figsize=fig_dims)
+    if len(data_dict) < n_row * n_col:
+        _ = [a.axis('off') for a in axes.ravel()[len(data_dict) : ]]
     for c,(k,v) in enumerate(data_dict.items()):
         row_num,col_num = divmod(c, n_col)
         sns.distplot(v, ax=axes[row_num, col_num], **kwargs)
@@ -157,6 +159,8 @@ def barplots(data_dict, n_row, n_col, horizontal=True, fig_dims=None, save_fig=N
     if not fig_dims:
         fig_dims = (n_col * 4, n_row * 3)
     fig,axes = plt.subplots(n_row, n_col, squeeze=False, figsize=fig_dims)
+    if len(data_dict) < n_row * n_col:
+        _ = [a.axis('off') for a in axes.ravel()[len(data_dict) : ]]
     for c,(k,v) in enumerate(data_dict.items()):
         row_num,col_num = divmod(c, n_col)
         seq_types = (list,tuple,np.ndarray,pd.core.series.Series)
