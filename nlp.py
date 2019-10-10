@@ -6,7 +6,7 @@ A module to handle NLP tasks
 import numpy as np
 import re
 import os
-import pickle as pkl
+from sklearn.feature_extraction.text import TfidfVectorizer, CountVectorizer
 
 
 def embed_documents(model, document_list, progress_step=50, print_stats=True):
@@ -60,63 +60,24 @@ def replace_chars(string, replace_chars, replacement=' '):
     return string.strip()
 
 
-def read_txt(filepath, replace=None, min_line_len=1, 
-             encoding='utf8', join_on=' '):
+def vectorize_text(*data, vectorizer, **kwargs):
     '''
-    Read txt file and return as a single string
-    Preprocessing:
-        replace some chars
-        add length threshold
+    Vectorize input data in the text form on word level split by spaces
+    Uses first data argument as the one for fitting, others are for transformation only
+    Return fitted vectorizer and a list of transformed data
     '''
-    with open(filepath, 'r', encoding=encoding) as f:
-        txt = f.readlines()
-    lines = []
-    for line in txt:
-        if replace:
-            line = replace_chars(line, replace)
-        if len(line) >= min_line_len:
-            lines.append(line)
-    return join_on.join(lines)
-
-
-
-def get_class_sizes(base_dir, class_list, print_stats=True):
-    '''
-    Prints out the length of each class from a folder
-    And returns them as a dictionary
-    '''
-    class_lens = {c: len(os.listdir(os.path.join(base_dir,c))) for c in class_list}    
-    if print_stats:
-        print('Files per each class:')
-        print(class_lens)
-    return class_lens
-    
-
-def get_class_files(base_dir, class_list):
-    '''
-    Get list of all filenames for each class
-    And returns them as dictionary
-    '''
-    class_files = {}
-    for c in class_list:
-        class_dir = os.path.join(base_dir, c)
-        class_files[c] = [os.path.join(base_dir,c,f) for f in os.listdir(class_dir)]
-    return class_files
-
-
-def pickle_data(filename, value=None, mode='w'):
-    '''
-    Saves a value into filename as pickle if mode == 'w'
-    Else if mode == 'r' then reads a value from filename
-    '''
-    if mode == 'w':
-        assert value is not None, 'Do not overwrite filename with None'
-        with open(filename, 'wb') as f:
-            pkl.dump(value, f)
-        return None
-    elif mode == 'r':
-        with open(filename, 'rb') as f:
-            unpickled = pkl.load(f)
-        return unpickled
-    else:
-        raise Exception('mode should be in ("w","r")')
+    vectorizer = vectorizer.lower()
+    assert vectorizer in ['tfidf','bow']
+    if vectorizer == 'tfidf':
+        print('Using Tf-Idf with', kwargs)
+        vectorizer = TfidfVectorizer(**kwargs)
+    elif vectorizer == 'bow':
+        print('Using bag-of-words with', kwargs)
+        vectorizer = CountVectorizer(**kwargs)
+    vectorizer.fit(data[0])
+    transformed = []
+    for d in data:
+        t = vectorizer.transform(d).toarray()
+        transformed.append(t)
+    print("Vocab size:", len(vectorizer.vocabulary_))
+    return vectorizer, transformed

@@ -1,8 +1,12 @@
 # -*- coding: utf-8 -*-
 """
-Operations on OS
+Operations on OS:
+    Read, write, remove files
+    Get a list of files
+    Working with directories
 """
 import os, shutil
+import pickle as pkl
 
 
 def create_dir(dir_path, empty_if_exists=True):
@@ -27,3 +31,67 @@ def get_abs_path(src, dest, depth=2):
     for i in range(depth):
         project_dir = os.path.dirname(project_dir)
     return os.path.join(project_dir, dest)
+
+
+def read_txt(filepath, replace=None, min_line_len=1, 
+             encoding='utf8', join_on=' '):
+    '''
+    Read txt file and return as a single string
+    Preprocessing:
+        replace some chars
+        add length threshold
+    '''
+    with open(filepath, 'r', encoding=encoding) as f:
+        txt = f.readlines()
+    lines = []
+    for line in txt:
+        if replace:
+            line = replace_chars(line, replace)
+        if len(line) >= min_line_len:
+            lines.append(line)
+    return join_on.join(lines)
+
+
+def get_class_sizes(base_dir, class_list, print_stats=True):
+    '''
+    Print out the length of each class from a folder
+    And return them as a dictionary
+    '''
+    class_lens = {c: len(os.listdir(os.path.join(base_dir,c))) for c in class_list}    
+    if print_stats:
+        print('Files per each class:')
+        print(class_lens)
+    return class_lens
+    
+
+def get_class_files(base_dir, class_list=None):
+    '''
+    Get a list of all filenames for each class
+    And return them as dictionary
+    If class_list not provided then use all subfolders from base_dir as classes 
+    '''
+    if class_list is None:
+        class_list = os.listdir(base_dir)
+    class_files = {}
+    for c in class_list:
+        class_dir = os.path.join(base_dir, c)
+        class_files[c] = [os.path.join(base_dir,c,f) for f in os.listdir(class_dir)]
+    return class_files
+
+
+def pickle_data(filename, value=None, mode='w'):
+    '''
+    Save a value into filename as pickle if mode == 'w'
+    Else if mode == 'r' then reads a value from filename
+    '''
+    if mode == 'w':
+        assert value is not None, 'Do not overwrite filename with None'
+        with open(filename, 'wb') as f:
+            pkl.dump(value, f)
+        return None
+    elif mode == 'r':
+        with open(filename, 'rb') as f:
+            unpickled = pkl.load(f)
+        return unpickled
+    else:
+        raise Exception('mode should be in ("w","r")')
