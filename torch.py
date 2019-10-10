@@ -299,7 +299,7 @@ class Trainer():
                 val_score = val_score * (-1)
             if val_score < best_val_score:
                 best_model_weights = copy.deepcopy(self.model.state_dict())
-                best_val_score = val_score
+                best_val_score = copy.deepcopy(val_score)
                 no_improvement = 0
             else:
                 no_improvement += 1
