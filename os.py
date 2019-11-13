@@ -7,6 +7,7 @@ Operations on OS:
 """
 import os, shutil
 import pickle as pkl
+import json
 
 
 def create_dir(dir_path, empty_if_exists=True):
@@ -20,7 +21,7 @@ def create_dir(dir_path, empty_if_exists=True):
             os.makedirs(dir_path)
     else:
         os.makedirs(dir_path)
-        
+
 
 def get_abs_path(src, dest, depth=2):
     '''
@@ -33,7 +34,7 @@ def get_abs_path(src, dest, depth=2):
     return os.path.join(project_dir, dest)
 
 
-def read_txt(filepath, replace=None, min_line_len=1, 
+def read_txt(filepath, replace=None, min_line_len=1,
              encoding='utf8', join_on=' '):
     '''
     Read txt file and return as a single string
@@ -57,18 +58,18 @@ def get_class_sizes(base_dir, class_list, print_stats=True):
     Print out the length of each class from a folder
     And return them as a dictionary
     '''
-    class_lens = {c: len(os.listdir(os.path.join(base_dir,c))) for c in class_list}    
+    class_lens = {c: len(os.listdir(os.path.join(base_dir,c))) for c in class_list}
     if print_stats:
         print('Files per each class:')
         print(class_lens)
     return class_lens
-    
+
 
 def get_class_files(base_dir, class_list=None):
     '''
     Get a list of all filenames for each class
     And return them as dictionary
-    If class_list not provided then use all subfolders from base_dir as classes 
+    If class_list not provided then use all subfolders from base_dir as classes
     '''
     if class_list is None:
         class_list = os.listdir(base_dir)
@@ -95,3 +96,21 @@ def pickle_data(filename, value=None, mode='w'):
         return unpickled
     else:
         raise Exception('mode should be in ("w","r")')
+
+
+def load_json(filepath):
+    '''
+    Load a json file and return it
+    '''
+    assert os.path.exists(filepath)
+    with open(filepath, 'r') as f:
+        data = json.load(f)
+    return data
+
+
+def write_json(data, filepath):
+    '''
+    Write data into a json file
+    '''
+    with open(filepath, 'w') as f:
+        json.dump(data, f)
