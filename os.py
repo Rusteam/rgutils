@@ -34,23 +34,18 @@ def get_abs_path(src, dest, depth=2):
     return os.path.join(project_dir, dest)
 
 
-def read_txt(filepath, replace=None, min_line_len=1,
-             encoding='utf8', join_on=' '):
+def read_txt(filepath, encoding='utf-8'):
     '''
-    Read txt file and return as a single string
-    Preprocessing:
-        replace some chars
-        add length threshold
+    Read txt file and return as a list of strings
     '''
     with open(filepath, 'r', encoding=encoding) as f:
-        txt = f.readlines()
-    lines = []
-    for line in txt:
-        if replace:
-            line = replace_chars(line, replace)
-        if len(line) >= min_line_len:
-            lines.append(line)
-    return join_on.join(lines)
+        txt = f.read().strip('\n').split('\n')
+    # lines = []
+    # for line in txt:
+    #     if len(line) >= min_line_len:
+    #         lines.append(line)
+    # return join_on.join(lines)
+    return txt
 
 
 def get_class_sizes(base_dir, class_list, print_stats=True):
