@@ -31,14 +31,14 @@ def neg_mse_to_rmse(neg_mse):
 def f_score_macro(y_true, y_pred):
     ''' Call F1 score with macro averaging '''
     return f1_score(y_true, y_pred, average='macro')
-    
+
 
 def search_grid(model, X_data, y_data, search_space, metric, num_folds, metric_func=None):
     '''
     Searches in the provided space for a best metric
     Returns best model, train/test scores and best parameters
     '''
-    grid = GridSearchCV(model, search_space, scoring=metric, cv=num_folds, 
+    grid = GridSearchCV(model, search_space, scoring=metric, cv=num_folds,
                         n_jobs=-1, return_train_score=True, verbose=2)
     grid.fit(X_data, y_data)
     best_index = grid.best_index_
@@ -51,13 +51,13 @@ def search_grid(model, X_data, y_data, search_space, metric, num_folds, metric_f
     print('='*5, ' Grid Search Results ', '='*5)
     print('Best parameters are:')
     pprint(grid.best_params_)
-    print('Best train score %.4f, validation %.4f (mean val %.4f)' % 
+    print('Best train score %.4f, validation %.4f (mean val %.4f)' %
                           (train_score, best_val_score, best_std))
     print('='*33)
     return grid.best_estimator_, grid.best_params_
 
 
-def plot_feature_importances(feature_names, feature_importances, 
+def plot_feature_importances(feature_names, feature_importances,
                              orient='h', max_show=15, fig_shape=(8,6)):
     '''
     Plots feature importances
@@ -73,7 +73,7 @@ def plot_feature_importances(feature_names, feature_importances,
                 orient=orient)
     plt.show()
 
-    
+
 def train_model(X_train, y_train, X_val, y_val, estimator, metric_func):
     '''
     Train a model and return it
@@ -81,9 +81,9 @@ def train_model(X_train, y_train, X_val, y_val, estimator, metric_func):
     if estimator == 'lgb':
         lgb_train_set = lgb.Dataset(X_train, label=y_train)
         lgb_val_set = lgb.Dataset(X_val, label=y_val)
-        estimator = lgb.train(lgbm_params, lgb_train_set, 
+        estimator = lgb.train(lgbm_params, lgb_train_set,
                   valid_sets=[lgb_train_set, lgb_val_set], valid_names=['train','valid'],
-                  num_boost_round=NUM_ROUNDS, early_stopping_rounds=EARLY_STOP, 
+                  num_boost_round=NUM_ROUNDS, early_stopping_rounds=EARLY_STOP,
                   verbose_eval=NUM_ROUNDS//10)
     else:
         estimator.fit(X_train, y_train)
@@ -122,7 +122,7 @@ def balanced_cross_validation(X_data, y_data, estimator, num_folds, metric_func,
         y_train = pd.concat([train_pos_lab, train_neg_lab], axis=0, ignore_index=True,)
         X_val = pd.concat([val_pos, val_neg], axis=0, ignore_index=True)
         y_val = pd.concat([val_pos_lab, val_neg_lab], axis=0, ignore_index=True,)
-        model,train_score,val_score = train_model(X_train, y_train, X_val, y_val, 
+        model,train_score,val_score = train_model(X_train, y_train, X_val, y_val,
                                                   estimator, metric_func)
         new_name = name + str(i)
         cv_models[new_name] = model
@@ -153,7 +153,7 @@ def cross_validation(train_data, train_labels, estimator, num_folds, metric_func
     '''
     Performs num_folds cross-validation using estimator
     Returns a dictionary of trained models and scores
-    (If using lightgbm then provide 'lgb' to estimator and 
+    (If using lightgbm then provide 'lgb' to estimator and
     make sure you imported it as "import lightgbm as lgb",
     also provide lgbm_params, num_rounds, early_stop;
     and metric_fn should be str the same as in lgbm_params)
@@ -168,22 +168,26 @@ def cross_validation(train_data, train_labels, estimator, num_folds, metric_func
 
     for i,(train_i,val_i) in tqdm(enumerate(cv.split(train_data, train_labels)), desc='Folds'):
         if isinstance(train_data, (pd.core.frame.DataFrame, pd.core.series.Series)):
-            X_train,y_train = train_data.iloc[train_i], train_labels[train_i]
-            X_val,y_val = train_data.iloc[val_i], train_labels[val_i]
+            X_train,X_val = train_data.iloc[train_i],train_data.iloc[val_i]
         elif isinstance(train_data, (np.ndarray,)):
-            X_train,y_train = train_data[train_i], train_labels[train_i]
-            X_val,y_val = train_data[val_i], train_labels[val_i]
+            X_train,X_val = train_data[train_i], train_data[val_i]
         else:
-            raise Exception('Passed data not pd.DataFrame, pd.Series or np.ndarray')
+            raise Exception('Passed X data not pd.DataFrame, pd.Series or np.ndarray')
+        if isinstance(train_labels, (pd.core.frame.DataFrame, pd.core.series.Series)):
+            y_train,y_val = train_labels.iloc[train_i],train_labels.iloc[val_i]
+        elif isinstance(train_labels, (np.ndarray,)):
+            y_train,y_val = train_labels[train_i], train_labels[val_i]
+        else:
+            raise Exception('Passed y data not pd.DataFrame, pd.Series or np.ndarray')
         if estimator == 'lgb':
             assert 'lgbm_params' in kwargs.keys(), 'If estimator lgb then provide lgbm_params in kwargs'
             assert 'num_rounds' in kwargs.keys(), 'If estimator lgb then provide num_rounds in kwargs'
             assert 'early_stop' in kwargs.keys(), 'If estimator lgb then provide early_stop in kwargs'
             lgb_train_set = lgb.Dataset(X_train, label=y_train)
             lgb_val_set = lgb.Dataset(X_val, label=y_val)
-            booster = lgb.train(kwargs['lgbm_params'], lgb_train_set, 
+            booster = lgb.train(kwargs['lgbm_params'], lgb_train_set,
                       valid_sets=[lgb_train_set, lgb_val_set], valid_names=['train','valid'],
-                      num_boost_round=kwargs['num_rounds'], early_stopping_rounds=kwargs['early_stop'], 
+                      num_boost_round=kwargs['num_rounds'], early_stopping_rounds=kwargs['early_stop'],
                       verbose_eval=kwargs['num_rounds']//10)
             new_name = model_name + str(i)
             cv_models[new_name] = booster
@@ -212,8 +216,8 @@ def cv_predict(cv_models, x_data):
     for _,mod in cv_models.items():
         cv_predicted += mod.predict(x_data,) / len(cv_models)
     return cv_predicted
-	
-	
+
+
 def holdout_indices(start_range, stop_range, range_step, holdout_len, print_stats=True):
     '''
     Init empty list
