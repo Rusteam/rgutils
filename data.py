@@ -27,7 +27,7 @@ def feature_distribution(feature_name, tables, dist_type='value_counts', sort_in
     Compares distribution of a feature across train and test
     Distribution types are value_counts, describe
     '''
-    assert isinstance(tables, (list, tuple)) 
+    assert isinstance(tables, (list, tuple))
     tbl_dists = []
     if dist_type == 'value_counts':
         for tbl in tables:
@@ -75,7 +75,7 @@ def ohe_encoding(feature_name, data, suffix='ohe'):
     return ohe
 
 
-def mean_encoding(feature_name, data, target_name, func='mean', 
+def mean_encoding(feature_name, data, target_name, func='mean',
                   is_test=False, mean_encodings=None, suffix='mean_enc'):
     '''
     Performs mean encoding for a categorical feature
@@ -116,10 +116,10 @@ def extract_period(colname, data, year=True, month=True, day=True, quarter=False
     return pd.DataFrame(include_periods)
 
 
-def time_diff(colname, data, date_end, diff_base='day', input_format='%Y-%m-%d', 
+def time_diff(colname, data, date_end, diff_base='day', input_format='%Y-%m-%d',
               suffix='diff'):
     '''
-    Computes time difference between date series and date_end 
+    Computes time difference between date series and date_end
     with specified base: year/month/day/hour/minute/second
     '''
     assert diff_base in ['year','month','day','hour','minute','second']
@@ -190,14 +190,14 @@ def pairwised_distributions(data, index_column, value_column):
     return data_dict
 
 
-def calc_shares(numeric_feature, category_feature, id_colname, data, 
+def calc_shares(numeric_feature, category_feature, id_colname, data,
                percentage=True, absolute=True, suffix='', eps=1e-4):
     '''
-    Computes percentages and absolute values of a numeric feature 
+    Computes percentages and absolute values of a numeric feature
     across different levels of a categorical feature
     for each value in ID colname
     '''
-    
+
     pt = data.pivot_table(index=id_colname, columns=category_feature,
                           values=numeric_feature, aggfunc=np.sum, fill_value=0)
     cat_names = data[category_feature].unique().tolist()
@@ -229,7 +229,7 @@ def print_missing(data,):
     else:
         print('No missing values')
 
-        
+
 def change_ratio(current_value, previous_values, exclude_zeros=True, eps=1e-7,):
     '''
     Computes the ratio of change in current value in comparison with previous values
@@ -281,13 +281,13 @@ def remove_nans(X, y):
 
 
 def replace_array_vals(replace_map, array):
-    '''
-    Replace some array values with a new value
-    '''
-    assert isinstance(replace_map, dict) and isinstance(array, np.ndarray)
-    print('Initial labels:', set(array))
-    for old,new in replace_map.items():
-        matches = array == old
-        array[matches] = new
-    print('New labels:', set(array))
-    return array
+	'''
+	Replace some array values with a new value
+	'''
+	assert isinstance(replace_map, dict) and isinstance(array, np.ndarray)
+	print('Initial labels:', set(array))
+	for old,new in replace_map.items():
+	    matches = array == old
+	    array[matches] = new
+	print('New labels:', set(array))
+	return array
