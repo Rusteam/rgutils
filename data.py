@@ -291,3 +291,12 @@ def replace_array_vals(replace_map, array):
 	    array[matches] = new
 	print('New labels:', set(array))
 	return array
+
+
+def day_diff(from_date, to_date):
+	''' Calculate number of days between two dates '''
+	assert to_date >= from_date, 'from_date is later than to_date'
+	if to_date == from_date:
+	    return 0
+	else:
+	    return (to_date - from_date).days
