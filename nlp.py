@@ -97,3 +97,15 @@ def remove_emoji(string):
                            u"\U000024C2-\U0001F251"
                            "]+", flags=re.UNICODE)
     return emoji_pattern.sub(r'', string)
+
+
+def remove_links(text, replacement=' ',
+                link_headers = [
+                    'https?://\S*',
+                    'www\.\S*',
+                    't.me/\S*'
+                ]):
+    '''
+    Replace http(s)/www and other custom links from a text string with replacement
+    '''
+    return replace_chars(text, '|'.join(link_headers), replacement)

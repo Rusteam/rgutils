@@ -34,18 +34,21 @@ def get_abs_path(src, dest, depth=2):
     return os.path.join(project_dir, dest)
 
 
-def read_txt(filepath, encoding='utf-8'):
+def read_txt(filepath, encoding='utf-8', sep='\n'):
     '''
     Read txt file and return as a list of strings
     '''
     with open(filepath, 'r', encoding=encoding) as f:
-        txt = f.read().strip('\n').split('\n')
-    # lines = []
-    # for line in txt:
-    #     if len(line) >= min_line_len:
-    #         lines.append(line)
-    # return join_on.join(lines)
+        txt = f.read().strip(sep).split(sep)
     return txt
+
+
+def write_txt(filepath, data, encoding='utf-8', sep='\n'):
+    '''
+    Write a list of objects into a txt file
+    '''
+    with open(filepath, 'w', encoding=encoding) as f:
+        f.writelines(sep.join(data))
 
 
 def get_class_sizes(base_dir, class_list, print_stats=True):
