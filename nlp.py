@@ -83,6 +83,23 @@ def vectorize_text(*data, vectorizer, **kwargs):
     return vectorizer, transformed
 
 
+def explain_tfidf_doc(inverse_vocab, doc_vector, with_scores=False):
+    '''
+    Return sorted list of tokens that are most significant in a doc embedded with tfidf
+    If with_scores return tokens with tfidf values
+    '''
+    indices = np.squeeze(np.argwhere(doc_vector > 0), axis=1)
+    if len(indices) == 0:
+        if with_scores:
+            return {}
+        else:
+            return []
+    top_tokens = {inverse_vocab[voc_i]:doc_vector[voc_i] for voc_i in indices}
+    if not with_scores:
+        top_tokens = sorted(top_tokens, key=lambda x: top_tokens[x], reverse=True)
+    return top_tokens
+
+
 def remove_emoji(string):
     """
     Remove emoticons from a text string and
