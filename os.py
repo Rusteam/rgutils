@@ -96,19 +96,19 @@ def pickle_data(filename, value=None, mode='w'):
         raise Exception('mode should be in ("w","r")')
 
 
-def load_json(filepath):
+def load_json(filepath, **kwargs):
     '''
     Load a json file and return it
     '''
     assert os.path.exists(filepath)
     with open(filepath, 'r') as f:
-        data = json.load(f)
+        data = json.load(f, **kwargs)
     return data
 
 
-def write_json(data, filepath):
+def write_json(data, filepath, **kwargs):
     '''
     Write data into a json file
     '''
     with open(filepath, 'w') as f:
-        json.dump(data, f)
+        json.dump(data, f, **kwargs)
