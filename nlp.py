@@ -48,14 +48,14 @@ def segment_text_data(word_list, start_index, stop_index, word_len):
     return train_data
 
 
-def replace_chars(string, replace_chars, replacement=' '):
+def replace_chars(string, replace_chars, replacement=' ', **kwargs):
     '''
     Replace chars in string from replace_chars
     Replaces_chars should be like '\n|\d|\W'
     -----
     Returns updated string
     '''
-    string = re.sub(replace_chars, replacement, string)
+    string = re.sub(replace_chars, replacement, string, **kwargs)
     string = re.sub('\s+', ' ', string)
     return string.strip()
 
