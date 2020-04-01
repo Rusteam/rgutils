@@ -8,6 +8,7 @@ Operations on OS:
 import os, shutil
 import pickle as pkl
 import json
+import yaml
 
 
 def create_dir(dir_path, empty_if_exists=True):
@@ -96,19 +97,47 @@ def pickle_data(filename, value=None, mode='w'):
         raise Exception('mode should be in ("w","r")')
 
 
-def load_json(filepath):
+def load_json(filepath, **kwargs):
     '''
     Load a json file and return it
     '''
     assert os.path.exists(filepath)
     with open(filepath, 'r') as f:
-        data = json.load(f)
+        data = json.load(f, **kwargs)
     return data
 
 
-def write_json(data, filepath):
+def write_json(data, filepath, **kwargs):
     '''
     Write data into a json file
     '''
     with open(filepath, 'w') as f:
-        json.dump(data, f)
+        json.dump(data, f, **kwargs)
+
+
+def load_env_vars(env_names):
+    '''
+    Load environment variables
+    '''
+    envs = {name: os.environ.get(name, None) for name in env_names}
+    for name,val in envs.items():
+        assert val is not None, f"environment var ${name} is None"
+    return envs
+
+
+def load_yaml(filepath):
+    ''' Load yaml file '''
+    assert os.path.exists(filepath), f"{filepath} does not exist"
+    with open(filepath, 'r') as f:
+        data = yaml.load(f, Loader=yaml.BaseLoader)
+    return data
+
+
+def save_dataframe(dataframe, filepath, silent=True):
+    ''' Save a dataframe if filepath does not exist else append to it '''
+    if os.path.exists(filepath):
+        dataframe.to_csv(filepath, index=False, mode='a', header=False)
+    else:
+        dataframe.to_csv(filepath, index=False)
+    if not silent:
+        print(f'Data saved to {filepath}')

@@ -280,16 +280,16 @@ def remove_nans(X, y):
     return X, y
 
 
-def replace_array_vals(replace_map, array):
+def replace_array_vals(replace_map, array, silent=True):
 	'''
 	Replace some array values with a new value
 	'''
 	assert isinstance(replace_map, dict) and isinstance(array, np.ndarray)
-	print('Initial labels:', set(array))
+	if not silent: print('Initial labels:', set(array))
 	for old,new in replace_map.items():
 	    matches = array == old
 	    array[matches] = new
-	print('New labels:', set(array))
+	if not silent: print('New labels:', set(array))
 	return array
 
 

@@ -6,12 +6,11 @@ import copy
 import re
 from math import floor
 import numpy as np
-from sklearn.metrics import f1_score, recall_score, precision_score, accuracy_score
-for mod in ['mlflow',]:
-    try:
-        exec(f'import {mod}')
-    except ImportError as e:
-        print(e)
+from sklearn.metrics import f1_score, recall_score, precision_score
+try:
+    import mlflow
+except ImportError as e:
+    print(e)
 
 
 class BinaryClassificationMeter(object):
@@ -82,14 +81,44 @@ class MulticlassClassificationMeter:
         
     def values(self):
         return {'accuracy': self.accuracy,
-                'f1_weighted': self.f1_weighted / self.batches,
-                'f1_macro': self.f1_macro / self.batches,
+                'f1_weighted': self.f1_weighted / (self.batches + 1e-4),
+                'f1_macro': self.f1_macro / (self.batches + 1e-4),
+                }
+    
+    
+class TripletAccuracyMeter:
+    '''
+    Computes multi-class accuracy
+    '''
+    def __init__(self):
+        self.reset()
+        
+        
+    def reset(self):
+        self.correct = 0
+        self.total = 0
+        self.accuracy = 0
+        self.batches = 0
+        
+        
+    def update(self, anchors, positives, negatives, margin=0.1):
+        is_correct = torch.norm(anchors - positives, dim=1) - \
+                        torch.norm(anchors - negatives, dim=1) + margin < 0
+        self.correct += is_correct.sum().item()
+        self.total += is_correct.size(0)
+        self.accuracy = self.correct /  self.total * 100
+        self.batches += 1
+        
+        
+    def values(self):
+        return {'accuracy': self.accuracy,
                 }
 
         
-classification_meters = {
+meters = {
     'binary': BinaryClassificationMeter(),
     'multi': MulticlassClassificationMeter(),
+    'triplet': TripletAccuracyMeter()
 }
      
     
@@ -104,9 +133,10 @@ class Trainer():
     Note: to resume training, run trainer.run_training() and it will return aggregate history
     '''
     def __init__(self, classification, model, optimizer, criterion, device, input_size,
-                 train_dataloader, val_dataloader, test_dataloader=None, data_dtype=torch.float32,
-                 mlflow_tracking=None, lr_scheduler=None,
-                 tqdm_off=True):
+                 train_dataloader, val_dataloader, test_dataloader=None, 
+                 data_dtype=torch.float32,
+                 lr_scheduler=None, is_triplet=False,
+                 tqdm_off=True, mlflow_tracking=None,):
         '''
         Set training configs:
             classification - binary or multi
@@ -124,7 +154,7 @@ class Trainer():
         self.model = model
         # create optimizer if not given, create scheduler if so
         if isinstance(optimizer, (list,tuple)):
-            assert len(optimizer) == 2, f'Provide optimizer as a tuple of (Name, {kwargs})'
+            assert len(optimizer) == 2, f'Provide optimizer as a tuple of (Name, kwargs)'
             assert isinstance(lr_scheduler, (list,tuple)) and len(lr_scheduler) == 2, \
                                     f'Scheduler should look like optimizer'
             trainable_parameters = filter(lambda x: x.requires_grad, self.model.parameters())
@@ -136,7 +166,6 @@ class Trainer():
         self.criterion = criterion
         self.device = device
         self.input_size = input_size
-        self.meter = classification_meters[self.classification]
         self.train_dataloader = train_dataloader
         self.houldout_sets = {'val': val_dataloader,
                               'test': test_dataloader}
@@ -153,6 +182,28 @@ class Trainer():
         else:
             self.mlflow_tracking = None
             
+    
+    def prepare_inputs(self, batch_x, batch_y):
+        batch_x = batch_x.view(-1, *self.input_size).to(self.device, dtype=self.data_dtype)
+        y_dtype = torch.float32 if self.classification == 'binary' else torch.long
+        batch_y = batch_y.to(self.device, dtype=y_dtype)
+        return batch_x, batch_y
+    
+    
+    def net_forward(self, batch_x, batch_y, meter, model=None):
+        if self.classification == 'triplet':
+            triplets = self.model(batch_x, batch_y) if model is None \
+                    else model(batch_x, batch_y)
+            loss = self.criterion(*triplets)
+            meter.update(*triplets, margin=self.criterion.margin)
+        else:
+            y_pred = torch.squeeze(self.model(batch_x) if model is None \
+                                                    else model(batch_x), 
+                                dim=1)
+            loss = self.criterion(y_pred, batch_y,)
+            meter.update(batch_y, y_pred)
+        return loss
+
 
     def train_epoch(self,):
         '''
@@ -163,19 +214,14 @@ class Trainer():
         self.model.train()
 
         running_loss = 0
-        meter = classification_meters[self.classification]
+        meter = meters[self.classification]
         meter.reset()
         
-        for img_data,img_labels in self.train_dataloader:
-            images = img_data.view(-1, *self.input_size).to(self.device, dtype=self.data_dtype)
-            labels_dtype = torch.long if self.classification == 'multi' else torch.float32
-            labels = img_labels.to(self.device, dtype=labels_dtype)
+        for batch_x,batch_y in self.train_dataloader:
+            batch_x,batch_y = self.prepare_inputs(batch_x, batch_y)
+            loss = self.net_forward(batch_x, batch_y, meter)
 
-            y_pred = torch.squeeze(self.model(images), dim=1)
-            loss = self.criterion(y_pred, labels,)
-            
-            meter.update(labels, y_pred)
-            running_loss += loss.item() * labels.size(0)
+            running_loss += loss.item() * batch_y.size(0)
 
             self.optimizer.zero_grad()
             loss.backward()
@@ -187,28 +233,22 @@ class Trainer():
         return epoch_loss, meter.values()
 
 
-    def eval_model(self, holdout_type='val'):
+    def eval_model(self, holdout_type='val', model=None):
         '''
         Evaluate validation error after an epoch of training
         '''
         self.model.eval()
 
         running_loss = 0
-        meter = classification_meters[self.classification]
+        meter = meters[self.classification]
         meter.reset()
         
         data_loader = self.houldout_sets[holdout_type]
         with torch.no_grad():
-            for img_data, img_labels in data_loader:
-                images = img_data.view(-1, *self.input_size).to(self.device, dtype=self.data_dtype)
-                labels_dtype = torch.long if self.classification == 'multi' else torch.float32
-                labels = img_labels.to(self.device, dtype=labels_dtype)
-
-                y_pred = torch.squeeze(self.model(images), dim=1)
-                loss = self.criterion(y_pred, labels,)
-
-                meter.update(labels, y_pred)
-                running_loss += loss.item() * labels.size(0)
+            for batch_x, batch_y in data_loader:
+                batch_x,batch_y = self.prepare_inputs(batch_x, batch_y)
+                loss = self.net_forward(batch_x, batch_y, meter, model=model)
+                running_loss += loss.item() * batch_y.size(0)
 
         val_loss = running_loss / len(data_loader.dataset)
         return val_loss, meter.values()
@@ -262,7 +302,7 @@ class Trainer():
                 unfreeze_layers(self.model, **unfreeze_options)
                 if unfreeze_optim:
                     assert isinstance(unfreeze_optim, (tuple,list)) and len(unfreeze_optim) == 2, \
-                                f'Provide unfreeze_optimizer as a tuple of (Name, {kwargs})'
+                                f'Provide unfreeze_optimizer as a tuple of (Name, kwargs)'
                     trainable_parameters = filter(lambda x: x.requires_grad, self.model.parameters())
                     old_sd = self.optimizer.state_dict()
                     self.optimizer = getattr(optim, unfreeze_optim[0])(trainable_parameters, **unfreeze_optim[1])
@@ -309,10 +349,12 @@ class Trainer():
                     print(f'Early stopping at {ep} epoch')
                     break
         # get best model
-        self.model.load_state_dict(best_model_weights)
+        best_model = copy.deepcopy(self.model)
+        best_model.load_state_dict(best_model_weights)
         # run test metrics
         if self.houldout_sets['test'] is not None:
-            test_loss,test_results = self.eval_model(holdout_type='test')
+            test_loss,test_results = self.eval_model(holdout_type='test', 
+                                                     best_model=best_model)
             history['test_results'] = (test_loss,test_results)
             print()
             print('='*20)
@@ -326,7 +368,7 @@ class Trainer():
                 mlflow.log_metrics(test_results)
             mlflow.end_run()
         self.history = copy.deepcopy(history)
-        return self.model, history
+        return best_model, history
 
 
 def get_output_size(input_size, kernel_size, padding, stride):
