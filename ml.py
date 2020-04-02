@@ -51,7 +51,7 @@ def search_grid(model, X_data, y_data, search_space, metric, num_folds, metric_f
     print('='*5, ' Grid Search Results ', '='*5)
     print('Best parameters are:')
     pprint(grid.best_params_)
-    print('Best train score %.4f, validation %.4f (mean val %.4f)' %
+    print('Best train score %.4f, validation %.4f +- %.4f' %
                           (train_score, best_val_score, best_std))
     print('='*33)
     return grid.best_estimator_, grid.best_params_

@@ -60,7 +60,7 @@ def replace_chars(string, replace_chars, replacement=' '):
     return string.strip()
 
 
-def vectorize_text(*data, vectorizer, **kwargs):
+def vectorize_text(*data, vectorizer, silent=True, **kwargs):
     '''
     Vectorize input data in the text form on word level split by spaces
     Uses first data argument as the one for fitting, others are for transformation only
@@ -69,17 +69,17 @@ def vectorize_text(*data, vectorizer, **kwargs):
     vectorizer = vectorizer.lower()
     assert vectorizer in ['tfidf','bow']
     if vectorizer == 'tfidf':
-        print('Using Tf-Idf with', kwargs)
+        if not silent: print('Using Tf-Idf with', kwargs)
         vectorizer = TfidfVectorizer(**kwargs)
     elif vectorizer == 'bow':
-        print('Using bag-of-words with', kwargs)
+        if not silent: print('Using bag-of-words with', kwargs)
         vectorizer = CountVectorizer(**kwargs)
     vectorizer.fit(data[0])
     transformed = []
     for d in data:
         t = vectorizer.transform(d).toarray()
         transformed.append(t)
-    print("Vocab size:", len(vectorizer.vocabulary_))
+    if not silent: print("Vocab size:", len(vectorizer.vocabulary_))
     return vectorizer, transformed
 
 
