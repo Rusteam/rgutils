@@ -6,13 +6,14 @@ import copy
 import re
 from math import floor
 import numpy as np
-from sklearn.metrics import f1_score, recall_score, precision_score
+from sklearn.metrics import f1_score, recall_score, precision_score, roc_auc_score, average_precision_score
+from pytorch_metric_learning import miners
+import itertools
 try:
     import mlflow
 except ImportError as e:
     print(e)
-
-
+    
 class BinaryClassificationMeter(object):
     """
     Computes binary classification metrics for torch models
@@ -50,8 +51,8 @@ class BinaryClassificationMeter(object):
                 'f1_score': self.f1_score / self.batches,
                 'precision': self.precision / self.batches,
                 'recall': self.recall / self.batches}
-        
-        
+
+
 class MulticlassClassificationMeter:
     '''
     Computes multi-class accuracy
@@ -85,43 +86,62 @@ class MulticlassClassificationMeter:
                 'f1_macro': self.f1_macro / (self.batches + 1e-4),
                 }
     
-    
+
 class TripletAccuracyMeter:
     '''
-    Computes multi-class accuracy
+    Pairwise accuracy measures
     '''
     def __init__(self):
-        self.reset()
-        
+        self.reset()        
         
     def reset(self):
-        self.correct = 0
-        self.total = 0
-        self.accuracy = 0
-        self.batches = 0
+        self.tp = self.fp = self.fn = self.tn = 0
+        self.roc_auc = []
+        self.ap = []
         
         
-    def update(self, anchors, positives, negatives, margin=0.1):
-        is_correct = torch.norm(anchors - positives, dim=1) - \
-                        torch.norm(anchors - negatives, dim=1) + margin < 0
-        self.correct += is_correct.sum().item()
-        self.total += is_correct.size(0)
-        self.accuracy = self.correct /  self.total * 100
-        self.batches += 1
-        
-        
+    def update(self, batch_x, batch_y, margin=0.2):
+#         tp,fp,fn,tn = embedding_pairwise_metrics(batch_x, batch_y, threshold=margin,)
+#         self.tp += tp
+#         self.fp += fp
+#         self.fn += fn
+#         self.tn += tn
+        a_p, p, a_n, n = pairwise_indices(batch_x, batch_y,)
+        try:
+            roc_auc,ap = calc_ranking_score(batch_x[a_p], batch_x[p], 
+                                         batch_x[a_n], batch_x[n]) 
+            self.roc_auc.append(roc_auc)
+            self.ap.append(ap)
+        except AssertionError:
+            pass
+    
+    
     def values(self):
-        return {'accuracy': self.accuracy,
-                }
+        eps = 1e-4
+        total = sum([self.tp, self.fp, self.fn, self.tn])
+        acc = (self.tp + self.tn) / (total + eps) * 100
+        precision = self.tp / (self.tp + self.fp + eps)
+        recall = self.tp / (self.tp + self.fn + eps)
+        f1 = precision * recall / (precision + recall + eps)
+        roc_auc = np.mean(self.roc_auc)
+        avg_precision = np.mean(self.ap)
+        return {
+            'accuracy': acc,
+            'f1_score': f1,
+            'precision': precision,
+            'recall': recall,
+            'roc_auc': roc_auc,
+            'average_precision': avg_precision,
+            }
 
-        
+
 meters = {
     'binary': BinaryClassificationMeter(),
     'multi': MulticlassClassificationMeter(),
     'triplet': TripletAccuracyMeter()
 }
-     
-    
+
+
 class Trainer():
     '''
     Trains a model for specified number of epochs and evaluates
@@ -190,19 +210,19 @@ class Trainer():
         return batch_x, batch_y
     
     
-    def net_forward(self, batch_x, batch_y, meter, model=None):
+    def net_forward(self, batch_x, batch_y, model=None):
         if self.classification == 'triplet':
             triplets = self.model(batch_x, batch_y) if model is None \
                     else model(batch_x, batch_y)
+            assert triplets[0].size(0) > 0
             loss = self.criterion(*triplets)
-            meter.update(*triplets, margin=self.criterion.margin)
+            y_pred = self.model.embedding_net(batch_x)
         else:
             y_pred = torch.squeeze(self.model(batch_x) if model is None \
                                                     else model(batch_x), 
                                 dim=1)
             loss = self.criterion(y_pred, batch_y,)
-            meter.update(batch_y, y_pred)
-        return loss
+        return loss,y_pred
 
 
     def train_epoch(self,):
@@ -219,10 +239,12 @@ class Trainer():
         
         for batch_x,batch_y in self.train_dataloader:
             batch_x,batch_y = self.prepare_inputs(batch_x, batch_y)
-            loss = self.net_forward(batch_x, batch_y, meter)
-
-            running_loss += loss.item() * batch_y.size(0)
-
+            try:
+                loss,y_pred = self.net_forward(batch_x, batch_y,)
+            except AssertionError:
+                continue
+            running_loss += max(loss.item(),0) * batch_y.size(0)
+            meter.update(y_pred, batch_y)
             self.optimizer.zero_grad()
             loss.backward()
             self.optimizer.step()
@@ -247,9 +269,12 @@ class Trainer():
         with torch.no_grad():
             for batch_x, batch_y in data_loader:
                 batch_x,batch_y = self.prepare_inputs(batch_x, batch_y)
-                loss = self.net_forward(batch_x, batch_y, meter, model=model)
+                try:
+                    loss,y_pred = self.net_forward(batch_x, batch_y, model=model)
+                except AssertionError:
+                    continue
                 running_loss += loss.item() * batch_y.size(0)
-
+                meter.update(y_pred, batch_y)
         val_loss = running_loss / len(data_loader.dataset)
         return val_loss, meter.values()
 
@@ -329,9 +354,10 @@ class Trainer():
             # print stats if requested
             if print_stats:
                 print('='*10, 'Epoch', ep, '='*10)
-                print('%7d Loss | Score' % ep)
-                print('Train %.4f | %.3f' % (train_loss, train_meter['accuracy']))
-                print('Valid %.4f | %.3f' % (val_loss, val_meter['accuracy']))
+                m_name = monitor_metrics[0]
+                print('%7d Loss | %s' % (ep, m_name.capitalize()))
+                print('Train %.4f | %.3f' % (train_loss, train_meter[m_name]))
+                print('Valid %.4f | %.3f' % (val_loss, val_meter[m_name]))
                 print()
             # store weights for best model
             val_score = history[f'val_{best_metric}'][-1]
@@ -450,7 +476,7 @@ class SimpleCNN(nn.Module):
         x = self.conv_forward(x.float())
         x = x.view(-1, self.reshaped_size)
         return self.fc_forward(x)
-    
+
 
 def parameter_number(net):
     '''
@@ -493,3 +519,65 @@ def unfreeze_layers(model, include_pattern=None, except_pattern=None):
                 p.requires_grad = False
         else:
             p.requires_grad = True
+
+            
+
+def embedding_pairwise_metrics(features, labels, threshold, 
+                               max_neg_dist=1.0,):
+    '''
+    Create all positive and negative pairs,
+    compute pairwise distances
+    and calculate TP,FP,FN,TN using margin
+    '''
+    a_p,p,a_n,n = pairwise_indices(features, labels,)
+    n_p = torch.norm(features[a_p] - features[p], dim=1)
+    pos = n_p < threshold
+    tp = pos.sum().item()
+    fn = pos.size(0) - tp
+    n_n = torch.norm(features[a_n] - features[n], dim=1)
+    neg = n_n > threshold
+    tn = neg.sum().item()
+    fp = neg.size(0) - tn
+    assert sum([tp,fp,fn,tn]) == pos.size(0) + neg.size(0)
+    return tp,fp,fn,tn
+            
+
+def pairwise_indices(features, labels, pos_factor=5):
+    '''
+    Create two sets of pairs as anchors & positives and anchors & negatives
+    filtering negatives by max_neg_dist
+    Return indices as following anchors, positive, anchors, negative
+    '''
+    # get positive pairs
+    prod = torch.tensor(list(itertools.combinations(range(labels.size(0)), r=2)), device=features.device)
+    eq = labels[prod[:,0]] == labels[prod[:,1]]
+    pos_pairs_ind = prod[eq]
+    a_p = pos_pairs_ind[:,0]
+    p = pos_pairs_ind[:,1]
+    assert torch.equal(labels[a_p], labels[p])
+    assert torch.eq(a_p, p).sum() == 0
+    # get negative pairs
+    neg_pairs_ind = prod[eq == False]
+    tmp = features[neg_pairs_ind]
+    first,second = torch.chunk(tmp, 2, dim=1)
+    norms = torch.norm(first.squeeze(1) - second.squeeze(1), dim=1)
+    # filter number of negatives
+    tmp = neg_pairs_ind[norms < norms.mean()]
+    if tmp.size(0) > p.size(0) * pos_factor:
+        tmp = tmp[:p.size(0) * pos_factor]
+    a_n,n =  tmp[:,0], tmp[:,1]
+    assert torch.eq(labels[a_n], labels[n]).sum() == 0
+    assert (torch.norm(features[a_n] - features[n], dim=1) > norms.mean()).sum() == 0
+    return a_p,p,a_n,n
+
+
+def calc_ranking_score(a_p, p, a_n, n):
+    '''
+    Calculate ROC AUC score for pairs (anchor,positive) and (anchor,negative)
+    '''
+    assert a_p.size(0) > 0 and a_n.size(0) > 0
+    p_norms = torch.norm(a_p - p, dim=1).detach().cpu().numpy()
+    n_norms = torch.norm(a_n - n, dim=1).detach().cpu().numpy()
+    norms = np.concatenate((p_norms, n_norms), axis=0) * (-1)
+    y_true = np.concatenate((np.ones(len(p_norms)), np.zeros(len(n_norms))), axis=0)
+    return roc_auc_score(y_true, norms), average_precision_score(y_true, norms, pos_label=1)

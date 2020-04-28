@@ -1,4 +1,3 @@
-# ~*~ coding: utf-8 ~*~
 '''
 A module to make certain data operations
 '''
@@ -300,3 +299,17 @@ def day_diff(from_date, to_date):
 	    return 0
 	else:
 	    return (to_date - from_date).days
+
+
+def split_by_date(data, date_col, split_date):
+    '''
+    Splits dataset by dates:
+        before split date is train set
+        after split date is test set
+    Split date is "%Y-%m-%d", date column is in UTC
+    '''
+    is_test = data.apply(lambda x: x[date_col] > pd.to_datetime(split_date, utc=True), 
+                                        axis=1)
+    train_data = data[~is_test]
+    test_data = data[is_test]
+    return train_data, test_data
