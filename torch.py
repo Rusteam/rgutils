@@ -85,7 +85,11 @@ class MulticlassClassificationMeter:
                 'f1_weighted': self.f1_weighted / (self.batches + 1e-4),
                 'f1_macro': self.f1_macro / (self.batches + 1e-4),
                 }
+<<<<<<< HEAD
     
+=======
+
+>>>>>>> 0c1654be8178c6f02a8c8ac7f1178253b927c560
 
 class TripletAccuracyMeter:
     '''
@@ -97,6 +101,7 @@ class TripletAccuracyMeter:
     def reset(self):
         self.tp = self.fp = self.fn = self.tn = 0
         self.roc_auc = []
+<<<<<<< HEAD
         self.ap = []
         
         
@@ -112,6 +117,22 @@ class TripletAccuracyMeter:
                                          batch_x[a_n], batch_x[n]) 
             self.roc_auc.append(roc_auc)
             self.ap.append(ap)
+=======
+        
+        
+    def update(self, batch_x, batch_y, margin=0.2):
+        eps = 1e-4
+        tp,fp,fn,tn = embedding_pairwise_metrics(batch_x, batch_y, threshold=margin,)
+        self.tp += tp
+        self.fp += fp
+        self.fn += fn
+        self.tn += tn
+        a_p, p, a_n, n = pairwise_indices(batch_x, batch_y,)
+        try:
+            roc_auc = calc_roc_auc(batch_x[a_p], batch_x[p], 
+                                         batch_x[a_n], batch_x[n]) 
+            self.roc_auc.append(roc_auc)
+>>>>>>> 0c1654be8178c6f02a8c8ac7f1178253b927c560
         except AssertionError:
             pass
     
@@ -124,14 +145,24 @@ class TripletAccuracyMeter:
         recall = self.tp / (self.tp + self.fn + eps)
         f1 = precision * recall / (precision + recall + eps)
         roc_auc = np.mean(self.roc_auc)
+<<<<<<< HEAD
         avg_precision = np.mean(self.ap)
+=======
+        print(f'ROC AUC - {roc_auc:.3f}')
+>>>>>>> 0c1654be8178c6f02a8c8ac7f1178253b927c560
         return {
             'accuracy': acc,
             'f1_score': f1,
             'precision': precision,
             'recall': recall,
+<<<<<<< HEAD
             'roc_auc': roc_auc,
             'average_precision': avg_precision,
+=======
+            'total': total,
+            'num_pos': self.tp + self.fn,
+            'roc_auc': roc_auc,
+>>>>>>> 0c1654be8178c6f02a8c8ac7f1178253b927c560
             }
 
 
