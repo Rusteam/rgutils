@@ -1,15 +1,10 @@
 '''
 A module to make certain data operations
 '''
+from pprint import pprint
 from datetime import datetime as dt
 import pandas as pd
 import numpy as np
-try:
-	from imblearn.over_sampling import SMOTE, KMeansSMOTE, RandomOverSampler
-	from imblearn.under_sampling import RandomUnderSampler
-	from imblearn.combine import SMOTEENN
-except ImportError as e:
-	print(e)
 
 
 def get_date_range(ym_series):
@@ -246,6 +241,14 @@ def balance_data(X_data, y_data, sampler, **kwargs):
     Balance input features and labels using samplers from imbalance-learn lib
     Return fitted sampler and balanced data
     '''
+    try:
+        from imblearn.over_sampling import SMOTE, KMeansSMOTE, RandomOverSampler
+        from imblearn.under_sampling import RandomUnderSampler
+        from imblearn.combine import SMOTEENN
+    except ImportError as e:
+        print(e)
+        raise Exception('install "imblearn" lib first')
+
     sampler = sampler.lower()
     assert sampler in ['smote','over','under','comb','kmeans']
     if sampler == 'over':
@@ -313,3 +316,14 @@ def split_by_date(data, date_col, split_date):
     train_data = data[~is_test]
     test_data = data[is_test]
     return train_data, test_data
+
+
+def get_label_indices(labels):
+    ''' Return unique labels and indices related to them as a list of tuples '''
+    labels = np.array(labels)
+    uniq_lab = np.unique(labels)
+    res = []
+    for lab in uniq_lab:
+        indices = np.argwhere(labels == lab).squeeze(1)
+        res.append((lab, indices))
+    return res

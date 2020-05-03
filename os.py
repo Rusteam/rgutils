@@ -9,6 +9,7 @@ import os, shutil
 import pickle as pkl
 import json
 import yaml
+import joblib
 
 
 def create_dir(dir_path, empty_if_exists=True):
@@ -133,6 +134,16 @@ def load_yaml(filepath):
     return data
 
 
+def eval_yaml_params(conf_dict):
+    ''' Convert from str to passed format using eval from a dict '''
+    def eval_or_name_error(value):
+        try:
+            return eval(value)
+        except NameError:
+            return value
+    return {k:eval_or_name_error(v) for k,v in conf_dict.items()}
+
+
 def save_dataframe(dataframe, filepath, silent=True):
     ''' Save a dataframe if filepath does not exist else append to it '''
     if os.path.exists(filepath):
@@ -141,3 +152,21 @@ def save_dataframe(dataframe, filepath, silent=True):
         dataframe.to_csv(filepath, index=False)
     if not silent:
         print(f'Data saved to {filepath}')
+
+
+def write_joblib(data, filepath, **kwargs):
+    '''
+    Write data into a json file
+    '''
+    with open(filepath, 'wb') as f:
+        joblib.dump(data, f, **kwargs)
+        
+        
+def load_joblib(filepath, **kwargs):
+    '''
+    Load a json file and return it
+    '''
+    assert os.path.exists(filepath)
+    with open(filepath, 'rb') as f:
+        data = joblib.load(f, **kwargs)
+    return data

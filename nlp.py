@@ -5,7 +5,7 @@ A module to handle NLP tasks
 
 import numpy as np
 import re
-import os
+from collections.abc import Iterable
 from sklearn.feature_extraction.text import TfidfVectorizer, CountVectorizer
 
 
@@ -126,3 +126,19 @@ def remove_links(text, replacement=' ',
     Replace http(s)/www and other custom links from a text string with replacement
     '''
     return replace_chars(text, '|'.join(link_headers), replacement)
+
+
+def word_filter(text, stop_words):
+    ''' 
+    Filter tokens based on stopwords and remove attached non-word chars
+    Text can be either list of tokens or text to be split by space into tokens
+    -----
+    Return list of tokens
+    '''
+    if isinstance(text, str):
+        token_list = text.lower().split()
+    elif isinstance(text, Iterable):
+        token_list = list(map(lambda x: x.lower(), text))
+    filtered = [t for t in token_list if t not in stop_words]
+    return filtered
+
