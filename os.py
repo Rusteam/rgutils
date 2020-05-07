@@ -131,7 +131,7 @@ def load_yaml(filepath):
     assert os.path.exists(filepath), f"{filepath} does not exist"
     with open(filepath, 'r') as f:
         data = yaml.load(f, Loader=yaml.BaseLoader)
-    return data
+    return eval_yaml_params(data)
 
 
 def eval_yaml_params(conf_dict):
@@ -139,9 +139,11 @@ def eval_yaml_params(conf_dict):
     def eval_or_name_error(value):
         try:
             return eval(value)
-        except NameError:
+        except Exception:
             return value
-    return {k:eval_or_name_error(v) for k,v in conf_dict.items()}
+    return {k:eval_or_name_error(v)
+            if isinstance(v, str) else eval_yaml_params(v)
+             for k,v in conf_dict.items()}
 
 
 def save_dataframe(dataframe, filepath, silent=True):
