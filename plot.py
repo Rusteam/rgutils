@@ -176,3 +176,24 @@ def barplots(data_dict, n_row, n_col, horizontal=True, fig_dims=None, save_fig=N
     if save_fig:
         plt.savefig(save_fig)
     plt.show()
+
+
+def scatterplots(data_dict, n_row, n_col, 
+                 fig_dims=None, save_fig=None, **kwargs):
+    '''
+    Plot multiple scatterplots for a data_dict
+    Where keys are titles and values are tuples of 2 arrays (x and y)
+    '''
+    if not fig_dims:
+        fig_dims = (n_col * 4, n_row * 3)
+    fig,axes = plt.subplots(n_row, n_col, squeeze=False, figsize=fig_dims)
+    if len(data_dict) < n_row * n_col:
+        _ = [a.axis('off') for a in axes.ravel()[len(data_dict) : ]]
+    for c,(k,v) in enumerate(data_dict.items()):
+        row_num,col_num = divmod(c, n_col)
+        x,y= v
+        sns.scatterplot(y=y, x=x, ax=axes[row_num, col_num], **kwargs)
+        axes[row_num, col_num].set_title(k)
+    if save_fig:
+        plt.savefig(save_fig)
+    plt.show()
