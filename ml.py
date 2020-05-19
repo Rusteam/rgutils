@@ -9,7 +9,7 @@ from datetime import datetime as dt
 import pandas as pd
 import numpy as np
 import copy
-from tqdm import tqdm
+from tqdm import tqdm, tqdm_notebook
 from sklearn.decomposition import PCA, TruncatedSVD
 from sklearn.preprocessing import StandardScaler, MinMaxScaler
 from sklearn.manifold import TSNE
@@ -18,7 +18,7 @@ from sklearn.metrics import f1_score
 try:
     import lightgbm as lgb
 except ImportError as e:
-    print(e)
+    pass
 
 
 def neg_mse_to_rmse(neg_mse):
