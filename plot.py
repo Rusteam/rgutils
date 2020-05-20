@@ -132,11 +132,13 @@ def show_images(image_paths, n_row, n_col, fig_dims=(12,8),
     plt.show()
     
 
-def histograms(data_dict, n_row, n_col, fig_dims=None, save_fig=None, **kwargs):
+def histograms(data_dict, n_row, n_col, fig_dims=None, save_fig=None, xlims=[],
+               **kwargs):
     '''
     Plot multiple histograms for a data_dict
     Where keys are titles and values are arrays
     '''
+    assert isinstance(xlims, (tuple,list))
     if not fig_dims:
         fig_dims = (n_col * 4, n_row * 3)
     fig,axes = plt.subplots(n_row, n_col, squeeze=False, figsize=fig_dims)
@@ -144,7 +146,10 @@ def histograms(data_dict, n_row, n_col, fig_dims=None, save_fig=None, **kwargs):
         _ = [a.axis('off') for a in axes.ravel()[len(data_dict) : ]]
     for c,(k,v) in enumerate(data_dict.items()):
         row_num,col_num = divmod(c, n_col)
-        sns.distplot(v, ax=axes[row_num, col_num], **kwargs)
+        splot = sns.distplot(v, ax=axes[row_num, col_num], **kwargs)
+        if len(xlims) > 0:
+            assert len(xlims) == 2, 'xlims has to be list/tupe of 2 elements'
+            splot.set_xlim(*xlims)
         axes[row_num, col_num].set_title(k)
     if save_fig:
         plt.savefig(save_fig)
