@@ -21,6 +21,7 @@ class BinaryClassificationMeter(object):
     """
     def __init__(self):
         self.reset()
+        self.available_scores = ['accuracy','f1_score','precision','recall']
 
         
     def reset(self):
@@ -59,6 +60,7 @@ class MulticlassClassificationMeter:
     '''
     def __init__(self):
         self.reset()
+        self.available_scores = ['accuracy','f1_weighted','f1_macro']
         
         
     def reset(self):
@@ -92,7 +94,9 @@ class TripletAccuracyMeter:
     Pairwise accuracy measures
     '''
     def __init__(self):
-        self.reset()        
+        self.reset()
+        self.available_scores = ['accuracy', 'f1_score', 'precision', 
+                                 'recall', 'roc_auc', 'average_precision']
         
     def reset(self):
         self.tp = self.fp = self.fn = self.tn = 0
@@ -100,12 +104,7 @@ class TripletAccuracyMeter:
         self.ap = []
         
         
-    def update(self, batch_x, batch_y, margin=0.2):
-#         tp,fp,fn,tn = embedding_pairwise_metrics(batch_x, batch_y, threshold=margin,)
-#         self.tp += tp
-#         self.fp += fp
-#         self.fn += fn
-#         self.tn += tn
+    def update(self, batch_y, batch_x):
         a_p, p, a_n, n = pairwise_indices(batch_x, batch_y,)
         try:
             roc_auc,ap = calc_ranking_score(batch_x[a_p], batch_x[p], 
@@ -204,6 +203,7 @@ class Trainer():
             
     
     def prepare_inputs(self, batch_x, batch_y):
+        """ Prepare inputs for the model with dtype conversion and view """
         batch_x = batch_x.view(-1, *self.input_size).to(self.device, dtype=self.data_dtype)
         y_dtype = torch.float32 if self.classification == 'binary' else torch.long
         batch_y = batch_y.to(self.device, dtype=y_dtype)
@@ -211,6 +211,7 @@ class Trainer():
     
     
     def net_forward(self, batch_x, batch_y, model=None):
+        ''' Perform a forward pass common to train and eval '''
         if self.classification == 'triplet':
             triplets = self.model(batch_x, batch_y) if model is None \
                     else model(batch_x, batch_y)
@@ -244,7 +245,7 @@ class Trainer():
             except AssertionError:
                 continue
             running_loss += max(loss.item(),0) * batch_y.size(0)
-            meter.update(y_pred, batch_y)
+            meter.update(batch_y, y_pred)
             self.optimizer.zero_grad()
             loss.backward()
             self.optimizer.step()
@@ -274,7 +275,7 @@ class Trainer():
                 except AssertionError:
                     continue
                 running_loss += loss.item() * batch_y.size(0)
-                meter.update(y_pred, batch_y)
+                meter.update(batch_y, y_pred)
         val_loss = running_loss / len(data_loader.dataset)
         return val_loss, meter.values()
 
@@ -299,6 +300,10 @@ class Trainer():
         '''
         # if running again then add up to a history
         assert best_metric == 'loss' or best_metric in monitor_metrics
+        available_scores = meters[self.classification].available_scores
+        for m in monitor_metrics:
+            assert m in available_scores, \
+                    f"{m} is not among {available_scores}"
         if unfreeze_after:
             assert unfreeze_options is not None, 'If using unfreeze provide unfreeze options as well (could be empty dict)'
         if self.history is not None: #resumes training
