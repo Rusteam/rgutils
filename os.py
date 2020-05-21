@@ -130,20 +130,8 @@ def load_yaml(filepath):
     ''' Load yaml file '''
     assert os.path.exists(filepath), f"{filepath} does not exist"
     with open(filepath, 'r') as f:
-        data = yaml.load(f, Loader=yaml.BaseLoader)
-    return eval_yaml_params(data)
-
-
-def eval_yaml_params(conf_dict):
-    ''' Convert from str to passed format using eval from a dict '''
-    def eval_or_name_error(value):
-        try:
-            return eval(value)
-        except Exception:
-            return value
-    return {k:eval_or_name_error(v)
-            if isinstance(v, str) else eval_yaml_params(v)
-             for k,v in conf_dict.items()}
+        data = yaml.load(f, Loader=yaml.SafeLoader)
+    return data
 
 
 def save_dataframe(dataframe, filepath, silent=True):

@@ -125,7 +125,7 @@ def remove_links(text, replacement=' ',
     '''
     Replace http(s)/www and other custom links from a text string with replacement
     '''
-    return replace_chars(text, '|'.join(link_headers), replacement)
+    return re.sub('|'.join(link_headers), replacement, text)
 
 
 def word_filter(text, stop_words):
