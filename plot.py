@@ -153,6 +153,7 @@ def histograms(data_dict, n_row, n_col, fig_dims=None, save_fig=None, xlims=[],
         axes[row_num, col_num].set_title(k)
     if save_fig:
         plt.savefig(save_fig)
+    plt.tight_layout()
     plt.show()
 
 
@@ -180,6 +181,7 @@ def barplots(data_dict, n_row, n_col, horizontal=True, fig_dims=None, save_fig=N
         axes[row_num, col_num].set_title(k)
     if save_fig:
         plt.savefig(save_fig)
+    plt.tight_layout()
     plt.show()
 
 
@@ -201,4 +203,5 @@ def scatterplots(data_dict, n_row, n_col,
         axes[row_num, col_num].set_title(k)
     if save_fig:
         plt.savefig(save_fig)
+    plt.tight_layout()
     plt.show()
